@@ -1,0 +1,25 @@
+# machine-specific settings (copy config/local.example.yaml to config/local.yaml)
+config/local.yaml
+
+# credentials -- never commit
+*credentials*.json
+*creds*.json
+client_secret*.json
+token*.json
+rclone.conf
+
+# data never lives in the repository (it lives under the data root)
+data/
+Genomes/
+RepeatInformation/
+
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# fetch scratch folders
+.ga_tmp_*/
