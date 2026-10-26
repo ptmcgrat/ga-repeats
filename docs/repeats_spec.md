@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` *(name assumed)*
-**Document version:** 0.1, 2026-10-26 (first draft, from coordinator specification v0.4)
+**Document version:** 0.2, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from coordinator specification v0.5)
 **Owner:** McGrath lab
 **Status:** draft for discussion with the owner; no code written
 
@@ -148,4 +148,6 @@ Nothing is ready to integrate.
   `python ~/GenomeAlignments/ga-coordinator/scripts/sync.py push RepeatInformation/versions/RI_v1`.
 - **Throttling:** every script takes `--threads` and `--max-jobs` (`GA_MAX_THREADS`,
   `GA_MAX_JOBS`); no limit unless asked.
+- Install commands are printed in the conversation with every zip, and specifications are
+  shared directly as files readable in the browser.
 - Python 3.9 is the minimum for code that uses the common library.
