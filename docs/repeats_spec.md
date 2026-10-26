@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` *(name assumed)*
-**Document version:** 0.2, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from coordinator specification v0.5)
+**Document version:** 0.3, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7)
 **Owner:** McGrath lab
 **Status:** draft for discussion with the owner; no code written
 
@@ -50,6 +50,33 @@ Projects A, 2a, 2b and 3 consume its output through the coordinator.
 
 ---
 
+## 2a. Relatedness context (coordinator specification, section 4b)
+
+Context, not results and not a design. Sources: Malinsky et al. 2018, Blumer et al. 2025, Kumar et al. 2025;
+the species table is `config/species_context.tsv` in the coordinator repository.
+
+| code | species | ecogroup |
+|---|---|---|
+| MZ | *Maylandia zebra* (reference species) | mbuna |
+| AC | *Astatotilapia calliptera* | generalist (stands in for the ancestor) |
+| RC | *Rhamphochromis longiceps* | Rhamphochromis (pelagic) |
+| DT | *Diplotaxodon limnothrissa* | Diplotaxodon (pelagic) |
+| CV | *Copadichromis virginalis* | utaka |
+| MC | *Mchenga conophoros* | shallow benthic |
+| YH | *Aulonocara* sp. 'chitande type north' | deep benthic (true deep clade) |
+| AS | *Aulonocara stuartgranti* | deep benthic |
+
+- **The panel covers all seven ecogroups** of the Lake Malawi radiation, so a library build set can span them.
+- **The sequences are very close:** about 0.1–0.25% average divergence between species pairs (SNP level), within a
+  radiation that is roughly 0.4–0.8 million years old. That makes one shared library plausible; it is **untested**,
+  because none of the three papers measures repeat content or repeat divergence between species.
+- The group tree is not strictly bifurcating (extensive gene flow; the benthics may be of hybrid origin), so
+  "closely related" is a group-level summary.
+- Six large inversions (LG2, 9, 10, 11, 13, 20) distinguish some panel species from the reference. They matter
+  for coordinates and alignment, not for masking.
+
+---
+
 ## 3. Outputs
 
 Written under the data root, in a **version folder that is never overwritten**:
@@ -79,8 +106,8 @@ Written under the data root, in a **version folder that is never overwritten**:
 - one shared library for all assemblies (decision 2026-10);
 - whole genomes, not selected chromosomes (decision 2026-10-26).
 
-Raised, not decided: how the library is built (which genomes; RepeatModeler with
-`-LTRStruct`?); whether existing family names are kept now that the family table is
+Raised, not decided: how the library is built (which genomes, for example one or more per ecogroup;
+RepeatModeler with `-LTRStruct`?); whether existing family names are kept now that the family table is
 recreated; the library policy when a new panel arrives (frozen library and mask new genomes
 only, or rebuild and re-mask all).
 
