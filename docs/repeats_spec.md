@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` *(name assumed)*
-**Document version:** 0.3, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7)
+**Document version:** 0.4, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8)
 **Owner:** McGrath lab
 **Status:** draft for discussion with the owner; no code written
 
@@ -29,7 +29,7 @@ Projects A, 2a, 2b and 3 consume its output through the coordinator.
 
 | input | version | location | state |
 |---|---|---|---|
-| assemblies: one genome FASTA per panel assembly | panel P1 (25 assemblies, by accession version) | `<data root>/Genomes/<assembly_id>/<accession_version>/genome.fna.gz` (BGZF) | **not yet downloaded** (coordinator task) |
+| assemblies: one genome FASTA per panel assembly | panel P1 (25 assemblies, by accession version) | `<data root>/Genomes/<assembly_id>/<accession_version>/genome.fna.gz` (BGZF) | **downloaded 2026-10-26**: all 25 assemblies (with GFF3 for the 8 annotated), in Dropbox and on mzebra |
 | the panel | P1, `config/genome_panel_P1.tsv` | coordinator repository; read with `ga_common.panel` | available |
 | sequence names and lengths of each assembly | as fetched | `provenance.json` in the same folder | with the download |
 
@@ -143,7 +143,6 @@ code is written**.
 
 | question | blocking |
 |---|---|
-| **The P1 genomes are not downloaded yet** (coordinator: first `fetch.py --go` on mzebra pending) | **yes, for any run** |
 | Contract for the shared library, and exact fields of the `repeats` contract (class and family naming, divergence, BED columns) | before first integration |
 | Keep the existing family names, or take the names the recreated library gives? | no |
 | Which genomes build the library; RepeatModeler with `-LTRStruct`? | no |
@@ -156,7 +155,7 @@ code is written**.
 
 ## 8. Status
 
-Not started. Specification drafted; waiting for the P1 download and for the owner's plan.
+Not started. Specification drafted; the P1 genomes are available; waiting for the owner's plan.
 Nothing is ready to integrate.
 
 ---
