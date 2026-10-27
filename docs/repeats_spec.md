@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` *(name assumed)*
-**Document version:** 0.7, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs)
+**Document version:** 0.8, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library)
 **Owner:** McGrath lab
 **Status:** draft for discussion with the owner; no code written; **start at section 0 and `docs/repeats_briefing.md`**
 
@@ -65,9 +65,10 @@ Projects A, 2a, 2b and 3 consume its output through the coordinator.
 - The registry holds no entries yet (coordinator spec, section 7). Until it does, the
   coordinator's `ga_common.paths` gives the location of each assembly; the project never
   builds a data path by hand.
-- The common library is installed pinned:
-  `pip install "git+https://github.com/ptmcgrat/ga-coordinator.git@common-v0.1.0#subdirectory=common"`
-  (needs Python 3.9 or newer).
+- The common library is `ga_common`, in the `common/` folder of the coordinator repository (`ga-coordinator`). Install and use it
+  as `docs/USING_COMMON.md` in that repository describes: on mzebra, `pip install -e ~/GenomeAlignments/ga-coordinator/common`, or
+  pinned to the tag `common-v0.2.1`. It finds the coordinator's configuration through `GA_CONFIG_DIR` or the standard location
+  `~/GenomeAlignments/ga-coordinator/config` (needs Python 3.9 or newer).
 - Sequence names inside the genome files are exactly as NCBI delivered them (RefSeq `NC_...`
   for annotated assemblies, GenBank otherwise); outputs must use the same names.
 - Nothing from the pilot is inherited. The family table `RepeatModeler_TE.xlsx` is recreated

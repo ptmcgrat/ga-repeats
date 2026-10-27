@@ -1,7 +1,7 @@
 # Repeats project: briefing for the first conversation
 
 **For:** the student and the assistant of project 1 (Repeats). **Owner:** McGrath lab.
-**Version:** 1.2, 2026-10-26. Written by the coordinator; the project decides its own methods.
+**Version:** 1.3, 2026-10-26. Written by the coordinator; the project decides its own methods.
 
 This briefing is where the first conversation starts. It has two questions that have to be settled
 with the owner before any RepeatModeler run, and one paper that has to be gone over first because it
@@ -169,6 +169,9 @@ benchmark found hardest, so a sensitivity gap would matter most there. That is a
 5. **Unknown fraction.** Report it for the library (families) and for the masked genome (base pairs), and decide what to try for the
    unknowns (curation, a second classifier, similarity to Dfam).
 6. **Divergence landscape.** Do young (low-divergence) and old families both look sensible per class?
+7. **Per-chromosome masked fraction, in particular LG3.** Kumar et al. 2025 describe chromosome 3 as highly repetitive and as a place
+   where the reference differs from other *M. zebra* assemblies; in the P1 download its length varies 1.8-fold across assemblies
+   (58.7–105.3 Mb). Is the masked fraction of LG3 high, and does it track the length differences? (A question to look at, not a finding.)
 
 ### C3. What "good enough" means
 
