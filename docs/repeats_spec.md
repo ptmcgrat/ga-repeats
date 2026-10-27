@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` *(name assumed)*
-**Document version:** 0.5, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student)
+**Document version:** 0.7, 2026-10-26 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs)
 **Owner:** McGrath lab
 **Status:** draft for discussion with the owner; no code written; **start at section 0 and `docs/repeats_briefing.md`**
 
@@ -20,6 +20,10 @@ documentation and against evidence the student pastes. The student proposes; **t
 is the owner's, the assistant writes it into section 7 as an open question and does not settle it.
 
 **Read at the start of every session:** this specification and `docs/repeats_briefing.md`.
+
+**Before the first conversation, the student uploads the reference PDFs** listed in the briefing, Part D (items 1–5 are
+required, 6–8 may follow). The assistant's first action is to list the documents it can see in the project, with the title
+of each, and to ask for anything missing or unreadable. It does not go on until items 1–5 are there.
 
 **The first conversation follows this order:**
 1. The student reads Quah et al. 2025 (*Genome Research* 35:1094), in particular the Results section "Enrichment
@@ -250,6 +254,7 @@ has tried.
 | 2026-10-26 | Whole genomes | coordinator decision |
 | 2026-10-26 | The first conversation starts at the briefing (the pangenome paper, then questions 1 and 2); no installation or run before the owner agrees the plan | the owner wants the biology and the two design questions settled before compute |
 | 2026-10-26 | The assistant works with a student under the owner's supervision, with checkpoint questions (section 4a) | the owner's request |
+| 2026-10-26 | The student uploads PDFs of the reference papers and web pages (briefing, Part D); the assistant confirms it can see items 1–5 before the first conversation goes on | the uploaded copies are always present and fixed to a version; web access is not assumed |
 
 ---
 
@@ -297,5 +302,5 @@ Nothing is ready to integrate.
   shared directly as files readable in the browser.
 - Python 3.9 is the minimum for code that uses the common library.
 - **Documents in the Claude project:** this specification, `docs/repeats_briefing.md`, `genome_panel_P1.tsv` and `species_context.tsv`
-  from the coordinator repository, the RepeatModeler and RepeatMasker documentation, and the papers listed in the
-  briefing, Part D (web pages saved as PDF).
+  from the coordinator repository, the RepeatModeler and RepeatMasker documentation, and the papers and pages listed in the
+  briefing, Part D, **uploaded by the student as PDFs** (items 1–5 required, 6–8 may follow).

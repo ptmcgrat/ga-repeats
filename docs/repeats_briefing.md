@@ -1,7 +1,7 @@
 # Repeats project: briefing for the first conversation
 
 **For:** the student and the assistant of project 1 (Repeats). **Owner:** McGrath lab.
-**Version:** 1, 2026-10-26. Written by the coordinator; the project decides its own methods.
+**Version:** 1.2, 2026-10-26. Written by the coordinator; the project decides its own methods.
 
 This briefing is where the first conversation starts. It has two questions that have to be settled
 with the owner before any RepeatModeler run, and one paper that has to be gone over first because it
@@ -208,7 +208,31 @@ the open question on keeping existing family names (specification section 7).
 8. **Carleton et al. 2020**, Movement of transposable elements contributes to cichlid diversity, Molecular Ecology
    (doi 10.1111/mec.15685). Cited by Quah et al.; not read by the coordinator.
 
-Web pages are saved as PDF before they are uploaded to the project.
+### Uploading the sources (the student does this, before the first conversation)
+
+The student saves each source below **as a PDF** and uploads it to the Repeats project, so the assistant has the same
+fixed text at the start of every session. Items 1–5 are needed before the first conversation continues; items 6–8 may follow.
+
+| # | source | how to get the PDF | suggested file name |
+|---|---|---|---|
+| 1 | Quah et al. 2025 | on the journal page, "Download PDF" | `Quah2025_GenomeRes_pangenome.pdf` |
+| 2 | RepeatModeler README | browser: Print, then Save as PDF | `RepeatModeler_README.pdf` |
+| 3 | Goubert workshop tutorial | browser: Print, then Save as PDF | `Goubert_RM2_workshop.pdf` |
+| 4 | Flynn et al. 2020 | the PDF link on the PubMed Central page | `Flynn2020_RepeatModeler2.pdf` |
+| 5 | Goubert et al. 2022 | on the journal page, "Download PDF" | `Goubert2022_manual_curation.pdf` |
+| 6 | Ou et al. 2024 | the PDF link on the PubMed Central page | `Ou2024_GenomeBiol_TE_benchmark.pdf` |
+| 7 | Dfam classification page | browser: Print, then Save as PDF | `Dfam_classification.pdf` |
+| 8 | Carleton et al. 2020 | the journal page; use the Georgia Tech library if it is behind a paywall | `Carleton2020_MolEcol_TE_cichlids.pdf` |
+
+How:
+- **Papers:** use the publisher's or PubMed Central's own PDF, not a print of the web page.
+- **Web pages:** in the browser, Print, then choose Save as PDF. Open the result and check that the text can be selected
+  (it should not be a picture of the page) and that the whole page is there.
+- **Upload:** in the Repeats project, add the PDFs to the project's files.
+- **Check:** ask the assistant, "List the documents in this project and give the title of each." Re-upload anything that
+  is missing or unreadable.
+- **Version note:** run `RepeatModeler -version` and `RepeatMasker -v` once the tools are available, and tell the assistant
+  whether the uploaded README matches the installed version. If it does not, say so.
 
 ---
 
