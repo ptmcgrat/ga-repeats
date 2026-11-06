@@ -1,0 +1,11 @@
+>Cluster 0
+0	5000nt, >MZ_MZ4f_rnd-1_family-1#LTR/Gypsy... *
+1	4800nt, >MZ_NMetZ_rnd-1_family-7#LTR/Gypsy... at +/96.50%
+>Cluster 1
+0	3000nt, >MZ_MZ4f_rnd-2_family-3#Unknown... *
+>Cluster 2
+0	2500nt, >MZ_NMetZ_ltr-1_family-9#DNA/hAT... *
+1	2400nt, >MZ_NMetZ_rnd-4_family-2#Unknown... at -/88.10%
+2	2300nt, >MZ_MZ4f_rnd-5_family-8#LINE/L2... at 81.00%
+>Cluster 3
+0	1200nt, >MZ_NMetZ_rnd-3_family-4#DNA/TcMar-Tc1... *

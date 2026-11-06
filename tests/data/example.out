@@ -1,0 +1,12 @@
+
+  SW  perc perc perc  query    position in query     matching repeat       position in repeat
+score div. del. ins.  sequence begin  end  (left)    repeat  class/family   ----  ----  ---  ID
+
+  207 18.4 18.4  0.0  Human     75437 75485 (924515) C L2c    LINE/L2        (48) 3339  3282 101  
+ 1264 28.1 13.8  1.8  Human     75513 76236 (923764) + L2a    LINE/L2        2401 3210 (216) 102  
+  354 15.8  2.2  4.8  Human     76278 76399 (923601) + MER67A LTR/ERV1          1  119 (347) 103  
+ 1039 19.6  9.4  3.7  Human     76411 76779 (923221) C MSTC   LTR/ERVL-MaLR   (1)  427     1 104  
+ 1321 19.2  1.8  1.8  Human     76804 77089 (922911) + MER31A LTR/ERV1        200  485   (0) 105  
+  369 26.4  9.1  2.0  Human     77098 77240 (922760) + L2a    LINE/L2        3235 3387   (0) 102  
+  190 37.9  4.8  1.3  Human     77340 77486 (922514) C L2c    LINE/L2       (252) 3212  3061 101
+

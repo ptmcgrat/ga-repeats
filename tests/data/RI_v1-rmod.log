@@ -1,0 +1,208 @@
+RepeatModeler Version 2.0.9
+===========================
+Using output directory = /home/ad.gatech.edu/bio-mcgrath-dropbox/scratch/ga-repeats/RI_v1/RM_3467992.FriOct300014442026
+Search Engine = rmblast 2.17.1+
+Threads = 16
+Dependencies: TRF 4.09, RECON 1.10, RepeatScout 1.0.7, RepeatMasker 4.2.6, RepeatAfterMe 0.0.7
+LTR Structural Analysis: Enabled ( GenomeTools 1.6.4, LTR_Retriever v2.9.0,
+                                   Ninja 1.00-cluster_only, MAFFT 7.471,
+                                   CD-HIT 4.8.1 )
+Random Number Seed: 1793333684
+Database = /home/ad.gatech.edu/bio-mcgrath-dropbox/scratch/ga-repeats/RI_v1/MZ_MZ4f 
+  - Sequences = 61
+  - Bases = 972958384
+Storage Throughput = excellent ( 1483.12 MB/s )
+
+
+RepeatModeler Round # 1
+========================
+Searching for Repeats
+ -- Sampling from the database...
+   - Gathering up to 40000000 bp
+   - Final Sample Size = 40808826 bp ( 40015310 non ambiguous )
+   - Num Contigs Represented = 25
+   - Sequence extraction : 00:00:31 (hh:mm:ss) Elapsed Time
+ -- Running RepeatScout on the sequences...
+   - RepeatScout: Running build_lmer_table ( l = 14, min = 10 )..
+   - RepeatScout: Running RepeatScout.. : 610 raw families identified
+   - RepeatScout: Running filtering stage.. 576 families remaining
+   - RepeatScout: 00:03:40 (hh:mm:ss) Elapsed Time
+   - Collecting repeat instances...
+   - Refining 543 families... 03:29:57 (hh:mm:ss) Elapsed Time
+   - Redundant Families and Large Satellite Filtering.. 
+      : 11 satellite(s), 160 contained, found in 00:00:06 (hh:mm:ss) Elapsed Time
+Family Refinement: 00:00:06 (hh:mm:ss) Elapsed Time
+Round Time: 03:34:18 (hh:mm:ss) Elapsed Time : 373 families discovered.
+
+
+RepeatModeler Round # 2
+========================
+Searching for Repeats
+ -- Sampling from the database...
+   - Gathering up to 10000000 bp
+   - Sequence extraction : 00:00:08 (hh:mm:ss) Elapsed Time
+ -- Running TRFMask on the sequence...
+   - TRFMask time 00:00:22 (hh:mm:ss) Elapsed Time
+ -- Masking repeats from the previous rounds...
+       8770 repeats masked totaling 2377956 bp(s).
+   - TE Masking time 00:00:23 (hh:mm:ss) Elapsed Time
+ -- Sample Stats:
+       Sample Size 10202315 bp
+       Num Contigs Represented = 23
+       Non ambiguous bp:
+             Initial: 10002315 bp
+             After Masking: 7266883 bp
+             Masked: 27.35 % 
+ -- Input Database Coverage: 10202315 bp out of 972958384 bp ( 1.05 % )
+Sampling Time: 00:00:53 (hh:mm:ss) Elapsed Time
+Running all-by-other comparisons...
+  - Total Comparisons = 32385
+Comparison Time: 00:02:48 (hh:mm:ss) Elapsed Time, 12931 HSPs Collected
+Number of families returned by RECON: 1210
+Round Time: 00:03:48 (hh:mm:ss) Elapsed Time : 29 families discovered.
+
+
+RepeatModeler Round # 3
+========================
+Searching for Repeats
+ -- Sampling from the database...
+   - Gathering up to 30000000 bp
+   - Sequence extraction : 00:00:24 (hh:mm:ss) Elapsed Time
+ -- Running TRFMask on the sequence...
+   - TRFMask time 00:01:04 (hh:mm:ss) Elapsed Time
+ -- Masking repeats from the previous rounds...
+       29705 repeats masked totaling 7576084 bp(s).
+   - TE Masking time 00:01:05 (hh:mm:ss) Elapsed Time
+ -- Sample Stats:
+       Sample Size 30606511 bp
+       Num Contigs Represented = 24
+       Non ambiguous bp:
+             Initial: 30012995 bp
+             After Masking: 21539111 bp
+             Masked: 28.23 % 
+ -- Input Database Coverage: 40808826 bp out of 972958384 bp ( 4.19 % )
+Sampling Time: 00:02:35 (hh:mm:ss) Elapsed Time
+Running all-by-other comparisons...
+  - Total Comparisons = 292230
+Comparison Time: 00:21:05 (hh:mm:ss) Elapsed Time, 69312 HSPs Collected
+Number of families returned by RECON: 3947
+Round Time: 00:25:48 (hh:mm:ss) Elapsed Time : 102 families discovered.
+
+
+RepeatModeler Round # 4
+========================
+Searching for Repeats
+ -- Sampling from the database...
+   - Gathering up to 90000000 bp
+   - Sequence extraction : 00:01:11 (hh:mm:ss) Elapsed Time
+ -- Running TRFMask on the sequence...
+   - TRFMask time 00:03:53 (hh:mm:ss) Elapsed Time
+ -- Masking repeats from the previous rounds...
+       104231 repeats masked totaling 26277458 bp(s).
+   - TE Masking time 00:04:00 (hh:mm:ss) Elapsed Time
+ -- Sample Stats:
+       Sample Size 91679570 bp
+       Num Contigs Represented = 35
+       Non ambiguous bp:
+             Initial: 90005858 bp
+             After Masking: 60482924 bp
+             Masked: 32.80 % 
+ -- Input Database Coverage: 132488396 bp out of 972958384 bp ( 13.62 % )
+Sampling Time: 00:09:09 (hh:mm:ss) Elapsed Time
+Running all-by-other comparisons...
+  - Total Comparisons = 2634660
+Comparison Time: 02:45:46 (hh:mm:ss) Elapsed Time, 238578 HSPs Collected
+Number of families returned by RECON: 11874
+Round Time: 02:57:15 (hh:mm:ss) Elapsed Time : 345 families discovered.
+
+
+RepeatModeler Round # 5
+========================
+Searching for Repeats
+ -- Sampling from the database...
+   - Gathering up to 270000000 bp
+   - Sequence extraction : 00:03:35 (hh:mm:ss) Elapsed Time
+ -- Running TRFMask on the sequence...
+   - TRFMask time 00:10:37 (hh:mm:ss) Elapsed Time
+ -- Masking repeats from the previous rounds...
+       389719 repeats masked totaling 95234747 bp(s).
+   - TE Masking time 00:25:27 (hh:mm:ss) Elapsed Time
+ -- Sample Stats:
+       Sample Size 275564953 bp
+       Num Contigs Represented = 45
+       Non ambiguous bp:
+             Initial: 270011457 bp
+             After Masking: 165439740 bp
+             Masked: 38.73 % 
+ -- Input Database Coverage: 408053349 bp out of 972958384 bp ( 41.94 % )
+Sampling Time: 00:39:55 (hh:mm:ss) Elapsed Time
+Running all-by-other comparisons...
+  - Total Comparisons = 23773960
+Comparison Time: 22:09:23 (hh:mm:ss) Elapsed Time, 606236 HSPs Collected
+Number of families returned by RECON: 40236
+Round Time: 22:57:37 (hh:mm:ss) Elapsed Time : 938 families discovered.
+
+RepeatScout/RECON discovery complete: 1787 families found
+
+
+LTR Structural Analysis
+=======================
+  -- Clustering results with previous rounds...
+       - 1787 RepeatScout/RECON families
+       - 848 LTRPipeline families
+       - Removed 239 redundant LTR families.
+       - Final family count = 2396
+LTRPipeline Time: 05:50:21 (hh:mm:ss) Elapsed Time
+
+
+#
+# RepeatClassifier
+#
+# Version 2.0.9
+# Threads: 16
+# Current Working Directory: /home/ad.gatech.edu/bio-mcgrath-dropbox/scratch/ga-repeats/RI_v1/RM_3467992.FriOct300014442026
+# FamDB:
+#   Database: Dfam
+#    Version: 4.0
+#       Date: 2026-05-22
+
+Building FamDB 4.0 reference libraries (one-time step)...
+  Location: /home/ad.gatech.edu/bio-mcgrath-dropbox//.RepeatModelerCache
+  Extracting RepeatPeps from FamDB...
+  Extracting consensus sequences from FamDB...
+  Building protein BLAST database...
+
+
+Building a new DB, current time: 10/31/2026 12:04:55
+New DB name:   /home/ad.gatech.edu/bio-mcgrath-dropbox/.RepeatModelerCache/PROT-Dfam_4.0/repeatpeps.lib
+New DB title:  /home/ad.gatech.edu/bio-mcgrath-dropbox//.RepeatModelerCache/PROT-Dfam_4.0/repeatpeps.lib
+Sequence type: Protein
+Keep MBits: T
+Maximum file size: 3000000000B
+Adding sequences from FASTA; added 18011 sequences in 0.450502 seconds.
+
+
+  Building nucleotide BLAST database...
+
+
+Building a new DB, current time: 10/31/2026 12:04:55
+New DB name:   /home/ad.gatech.edu/bio-mcgrath-dropbox/.RepeatModelerCache/CONS-Dfam_4.0/reference.fa
+New DB title:  /home/ad.gatech.edu/bio-mcgrath-dropbox//.RepeatModelerCache/CONS-Dfam_4.0/reference.fa
+Sequence type: Nucleotide
+Keep MBits: T
+Maximum file size: 3000000000B
+Adding sequences from FASTA; added 30659 sequences in 1.14357 seconds.
+
+
+  Done.
+# Protein Library: /home/ad.gatech.edu/bio-mcgrath-dropbox//.RepeatModelerCache/PROT-Dfam_4.0/repeatpeps.lib
+#   - 18011 proteins
+# Consensi Library: /home/ad.gatech.edu/bio-mcgrath-dropbox//.RepeatModelerCache/CONS-Dfam_4.0/reference.fa
+#   - 30659 consensus sequences
+  - Looking for simple/tandem and low complexity sequences..
+  - Looking for similarity to known repeat proteins..
+  - Looking for similarity to known repeat consensi..
+Classification Time: 00:25:26 (hh:mm:ss) Elapsed Time
+
+
+Program Time: 36:14:33 (hh:mm:ss) Elapsed Time
