@@ -147,6 +147,8 @@ def main(argv=None) -> None:
     print(f"cd-hit-est: thresholds {thresholds}, coverage of the shorter sequence {args.coverage}, "
           f"{args.threads} threads; RepeatMasker: -pa {pa} (about {pa * c.RMBLAST_CORES_PER_JOB} cores)")
     if out.exists():
+        if not (out / "summary.txt").exists():
+            c.stop(f"{out} holds an incomplete earlier run (no summary.txt); clear it with: rm -r {out}")
         c.stop(f"{out} already exists; results are never overwritten")
     if args.go:
         out.mkdir(parents=True)

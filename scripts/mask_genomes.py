@@ -53,7 +53,7 @@ def mask_one(args: argparse.Namespace, assembly: str, library: Path, pa: int) ->
     if not genome.exists():
         c.stop(f"[{assembly}] genome not found: {genome}")
     if work.exists():
-        c.stop(f"[{assembly}] {work} already exists")
+        c.stop(f"[{assembly}] {work} already exists; if an earlier attempt failed, clear it with: rm -r {work}")
     if dest.exists():
         c.stop(f"[{assembly}] {dest} already exists; masked results are never overwritten")
     if not args.go:

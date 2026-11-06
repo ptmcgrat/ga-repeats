@@ -4,7 +4,8 @@
 
 They need no container, no genome and no ga_common: they test the parsing and the
 arithmetic on small fixtures. tests/data/RI_v1-rmod.log and builddatabase.log are the
-real RI_v1 logs; example.out is the example in RepeatMasker 4.2.6's own help.
+real RI_v1 logs; example.out is the example in RepeatMasker 4.2.6's own help; cdhit_481_local.clstr holds
+two real CD-HIT 4.8.1 member lines.
 """
 import sys
 import tempfile
@@ -66,6 +67,18 @@ class Clusters(unittest.TestCase):
         self.assertAlmostEqual(members[4].identity, 88.10)
         self.assertAlmostEqual(members[5].identity, 81.00)
         self.assertEqual(members[2].cluster, 1)
+
+    def test_parse_clstr_local_alignment_lines(self):
+        # The two member lines are real CD-HIT 4.8.1 output (-G 0) from the RI_v1 comparisons;
+        # the representative lines around them are made up for the test.
+        members = c.parse_clstr(DATA / "cdhit_481_local.clstr")
+        self.assertEqual(len(members), 4)
+        self.assertEqual(members[0].name, "MZ_MZ4f_rnd-1_family-373#DNA/CMC-EnSpm")
+        self.assertEqual((members[0].length, members[0].representative), (167, False))
+        self.assertAlmostEqual(members[0].identity, 96.27)
+        self.assertTrue(members[1].representative)
+        self.assertEqual(members[2].name, "YH_YH2f_rnd-2_family-534#DNA")
+        self.assertAlmostEqual(members[2].identity, 87.14)
 
     def test_shared_unique(self):
         members = c.parse_clstr(DATA / "example.clstr")

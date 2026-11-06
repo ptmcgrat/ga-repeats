@@ -8,6 +8,7 @@ own output (facts_for_script.txt, 2026-11):
   - RepeatMasker -pa: each job uses 4 cores with RMBlast (RepeatMasker -help, 1.3)
   - library names: >repeatname#class/subclass (RepeatMasker -help, 1.1 -lib)
   - .out columns: RepeatMasker -help, section 3.1
+  - .clstr member lines with -G 0 carry alignment coordinates (real output, 2026-11; repeats_010)
 """
 from __future__ import annotations
 
@@ -189,7 +190,10 @@ class ClusterMember(NamedTuple):
     identity: Optional[float]  # percent identity to the representative; None for it
 
 
-_CLSTR_LINE = re.compile(r"^\d+\t(\d+)nt, >(.+?)\.\.\. (?:(\*)|at (?:[+-]/)?([\d.]+)%)\s*$")
+# Member lines: "at +/96.27%", or with local alignment (-G 0, CD-HIT 4.8.1) "at 1:161:8923:9083/+/96.27%"
+# (query start:end, representative start:end, strand, identity).
+_CLSTR_LINE = re.compile(r"^\d+\t(\d+)nt, >(.+?)\.\.\. "
+                         r"(?:(\*)|at (?:\d+:\d+:\d+:\d+/)?(?:[+-]/)?([\d.]+)%)\s*$")
 
 
 def parse_clstr(path: Path) -> List[ClusterMember]:

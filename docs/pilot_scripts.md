@@ -1,4 +1,4 @@
-# Question 1 pilot scripts (repeats_009)
+# Question 1 pilot scripts (repeats_009; cluster reading fixed in repeats_010)
 
 Run on mzebra, from the repository root, in the conda environment `ga-repeats`
 (`conda activate ga-repeats`). Every script prints what it would do; it acts only with
