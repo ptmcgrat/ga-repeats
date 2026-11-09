@@ -283,6 +283,63 @@ def check_bed(bed_rows: Iterable[Sequence[str]], lengths: Dict[str, int]) -> Lis
     return problems
 
 
+def read_bed(path: Path) -> List[Tuple[str, int, int, str, str]]:
+    """(sequence, start, end, family, top class) from a pilot BED written by mask_genomes.py."""
+    rows = []
+    with open(path) as handle:
+        for line in handle:
+            if line.startswith("#"):
+                continue
+            f = line.rstrip("\n").split("\t")
+            rows.append((f[0], int(f[1]), int(f[2]), f[3], top_class(f[6])))
+    return rows
+
+
+def merge_by_sequence(intervals: Iterable[Tuple[str, int, int]]) -> Dict[str, List[Tuple[int, int]]]:
+    """Half-open intervals merged per sequence: overlapping or touching spans become one."""
+    by_sequence: Dict[str, List[Tuple[int, int]]] = {}
+    for name, start, end in intervals:
+        by_sequence.setdefault(name, []).append((start, end))
+    merged: Dict[str, List[Tuple[int, int]]] = {}
+    for name, spans in by_sequence.items():
+        spans.sort()
+        out = [list(spans[0])]
+        for start, end in spans[1:]:
+            if start > out[-1][1]:
+                out.append([start, end])
+            else:
+                out[-1][1] = max(out[-1][1], end)
+        merged[name] = [(a, b) for a, b in out]
+    return merged
+
+
+def merged_length(merged: Dict[str, List[Tuple[int, int]]]) -> int:
+    return sum(end - start for spans in merged.values() for start, end in spans)
+
+
+def subtract_length(a: Dict[str, List[Tuple[int, int]]], b: Dict[str, List[Tuple[int, int]]]) -> int:
+    """Base pairs covered by a and not by b (both merged per sequence)."""
+    total = 0
+    for name, a_spans in a.items():
+        b_spans = b.get(name, [])
+        j = 0
+        for start, end in a_spans:
+            while j < len(b_spans) and b_spans[j][1] <= start:
+                j += 1
+            current = start
+            k = j
+            while k < len(b_spans) and b_spans[k][0] < end:
+                if b_spans[k][0] > current:
+                    total += b_spans[k][0] - current
+                current = max(current, b_spans[k][1])
+                if current >= end:
+                    break
+                k += 1
+            if current < end:
+                total += end - current
+    return total
+
+
 def union_length(intervals: Iterable[Tuple[str, int, int]]) -> int:
     """Base pairs covered by half-open intervals (sequence, start, end)."""
     by_sequence: Dict[str, List[Tuple[int, int]]] = {}

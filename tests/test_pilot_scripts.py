@@ -21,6 +21,8 @@ import _common as c  # noqa: E402
 import compare_libraries as cl  # noqa: E402
 import summarize_masking as sm  # noqa: E402
 import write_manifest as wm  # noqa: E402
+import compare_masking as cm  # noqa: E402
+import plot_pilot as pp  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -201,6 +203,81 @@ class Logs(unittest.TestCase):
             return
         self.assertEqual(yaml.safe_load(text)["list"][0]["b"], ["p", "q"])
         self.assertEqual(yaml.safe_load(text)["s"], 'say "hi"')
+
+
+class MaskingOverlap(unittest.TestCase):
+    """A masks s:0-10 (LTR) and s:20-30 (DNA); B masks s:5-25 (DNA); the genome is 100 bp."""
+
+    def setUp(self):
+        a = [("s", 0, 10, "A_f1", "LTR"), ("s", 20, 30, "A_f2", "DNA")]
+        b = [("s", 5, 25, "B_f1", "DNA")]
+        self.rows = cm.pair_rows("G", "A", "B", {"A": cm.masked_sets(a), "B": cm.masked_sets(b)}, 100)
+
+    def test_subtract_length(self):
+        m = c.merge_by_sequence
+        self.assertEqual(c.subtract_length(m([("s", 0, 10)]), m([("s", 2, 4), ("s", 6, 8)])), 6)
+        self.assertEqual(c.subtract_length(m([("s", 0, 10), ("s", 20, 30)]), m([("s", 5, 25)])), 10)
+        self.assertEqual(c.subtract_length(m([("s", 0, 10)]), {}), 10)
+        self.assertEqual(c.subtract_length(m([("s", 0, 10)]), m([("s", 0, 3), ("s", 2, 6), ("s", 9, 40)])), 3)
+
+    def test_pair_rows(self):
+        table = {(r[2], r[3]): (r[4], r[5]) for r in self.rows}
+        self.assertEqual(table[("A", "ALL")], (20, 10))   # A masks 20; 10 of them B does not
+        self.assertEqual(table[("B", "ALL")], (20, 10))
+        self.assertEqual(table[("A", "LTR")], (10, 5))
+        self.assertEqual(table[("A", "DNA")], (10, 5))
+        self.assertEqual(table[("B", "DNA")], (20, 10))
+
+    def test_overlap_bars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            table = Path(tmp) / "G.tsv"
+            c.write_tsv(table, ["assembly", "pair", "library", "class", "masked_bp", "masked_bp_not_masked_by_other",
+                                "genome_bp", "percent_masked", "percent_not_masked_by_other"], self.rows)
+            bars = pp.overlap_bars(Path(tmp))
+        both, only_a, only_b, a, b = bars["G: A vs B"]
+        self.assertEqual((round(both, 3), round(only_a, 3), round(only_b, 3), a, b), (10.0, 10.0, 10.0, "A", "B"))
+
+
+class Plots(unittest.TestCase):
+    def test_class_composition_counts_each_masking_once(self):
+        rows = [{"library_version": "RI_v1", "library_built_from": "X", "assembly": "G", "class": cls,
+                 "percent_masked": pct} for cls, pct in (("DNA", "10.0"), ("Satellite", "1.0"), ("ALL", "12.0"))]
+        comp = {"masking": rows}
+        out = pp.class_composition([comp, comp])
+        group = out["RI_v1 (X) on G"]
+        self.assertEqual((group["DNA"], group["Other"], group["_all"]), (10.0, 1.0, 12.0))
+
+    def test_figures_are_drawn(self):
+        try:
+            import matplotlib  # noqa: F401
+        except ImportError:
+            self.skipTest("matplotlib not installed here")
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "RI_v1_vs_RI_v2"
+            folder.mkdir()
+            (folder / "meta.json").write_text('{"a": "RI_v1", "b": "RI_v2", "id_a": "X", "id_b": "Y"}')
+            c.write_tsv(folder / "shared_unique_by_class.tsv",
+                        ["threshold", "class", "clusters_shared", "clusters_only_a", "clusters_only_b"],
+                        [["0.80", cls, 5, 3, 2] for cls in ("LTR", "DNA", "LINE", "SINE", "Unknown", "ALL")])
+            c.write_tsv(folder / "similarity_by_class.tsv",
+                        ["direction", "class", "families", "with_a_match", "match_covers_0.80",
+                         "median_divergence_of_matches"],
+                        [["RI_v2_in_RI_v1", "ALL", 10, 9, 6, "2.0"], ["RI_v1_in_RI_v2", "ALL", 10, 8, 5, "2.5"]])
+            overlap = Path(tmp) / "overlap"
+            overlap.mkdir()
+            c.write_tsv(overlap / "G.tsv", ["assembly", "pair", "library", "class", "masked_bp",
+                                            "masked_bp_not_masked_by_other", "genome_bp", "percent_masked",
+                                            "percent_not_masked_by_other"], MaskingOverlapRows)
+            out = Path(tmp) / "plots"
+            pp.main(["--comparisons", str(folder), "--overlap-dir", str(overlap), "--out", str(out), "--go"])
+            made = sorted(p.name for p in out.iterdir())
+        self.assertIn("fig1_shared_clusters_by_threshold.png", made)
+        self.assertIn("fig5_masking_overlap.pdf", made)
+        self.assertNotIn("fig4_class_composition.png", made)   # no masking summary in this folder
+
+
+MaskingOverlapRows = [["G", "A vs B", "A", "ALL", 20, 10, 100, "20.000", "10.000"],
+                      ["G", "A vs B", "B", "ALL", 20, 10, 100, "20.000", "10.000"]]
 
 
 if __name__ == "__main__":
