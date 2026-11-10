@@ -23,6 +23,7 @@ import summarize_masking as sm  # noqa: E402
 import write_manifest as wm  # noqa: E402
 import compare_masking as cm  # noqa: E402
 import plot_pilot as pp  # noqa: E402
+import masking_gain as mg  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -274,6 +275,37 @@ class Plots(unittest.TestCase):
         self.assertIn("fig1_shared_clusters_by_threshold.png", made)
         self.assertIn("fig5_masking_overlap.pdf", made)
         self.assertNotIn("fig4_class_composition.png", made)   # no masking summary in this folder
+
+
+class MaskingGain(unittest.TestCase):
+    """On a 100-bp genome: v1 masks 0-30 (DNA), v2 20-50 (LTR), v3 40-60 (Unknown); together 0-60."""
+
+    def setUp(self):
+        sets = {"v1": cm.masked_sets([("s", 0, 30, "f1", "DNA")]),
+                "v2": cm.masked_sets([("s", 20, 50, "f2", "LTR")]),
+                "v3": cm.masked_sets([("s", 40, 60, "f3", "Unknown")])}
+        self.rows = mg.gain_rows("G", sets, 100)
+
+    def steps(self, order):
+        return [(r[5], r[6]) for r in self.rows if r[1] == order and r[4] == "ALL"]
+
+    def test_each_step_adds_only_new_bases(self):
+        self.assertEqual(self.steps("v1 > v2 > v3"), [(30, 30), (20, 50), (10, 60)])
+        self.assertEqual(self.steps("v3 > v2 > v1"), [(20, 20), (20, 40), (20, 60)])
+
+    def test_every_order_ends_at_the_same_total(self):
+        finals = {r[6] for r in self.rows if r[4] == "ALL" and r[2] == 3}
+        self.assertEqual(finals, {60})
+        self.assertEqual(len({r[1] for r in self.rows}), 6)
+
+    def test_step_means_add_up_to_the_total(self):
+        means = mg.step_means(self.rows)
+        self.assertAlmostEqual(means[1], 80 / 3, places=2)   # first library: 30, 30 or 20 bp
+        self.assertAlmostEqual(sum(means.values()), 60.0, places=2)
+
+    def test_added_bases_carry_the_added_librarys_class(self):
+        row = next(r for r in self.rows if r[1] == "v1 > v2 > v3" and r[2] == 2 and r[4] == "LTR")
+        self.assertEqual(row[5], 20)
 
 
 MaskingOverlapRows = [["G", "A vs B", "A", "ALL", 20, 10, 100, "20.000", "10.000"],
