@@ -340,6 +340,26 @@ def subtract_length(a: Dict[str, List[Tuple[int, int]]], b: Dict[str, List[Tuple
     return total
 
 
+def intersect_length(a: Dict[str, List[Tuple[int, int]]], b: Dict[str, List[Tuple[int, int]]]) -> int:
+    """Base pairs covered by both a and b (both merged per sequence)."""
+    total = 0
+    for name, a_spans in a.items():
+        b_spans = b.get(name)
+        if not b_spans:
+            continue
+        i = j = 0
+        while i < len(a_spans) and j < len(b_spans):
+            start = max(a_spans[i][0], b_spans[j][0])
+            end = min(a_spans[i][1], b_spans[j][1])
+            if end > start:
+                total += end - start
+            if a_spans[i][1] < b_spans[j][1]:
+                i += 1
+            else:
+                j += 1
+    return total
+
+
 def union_length(intervals: Iterable[Tuple[str, int, int]]) -> int:
     """Base pairs covered by half-open intervals (sequence, start, end)."""
     by_sequence: Dict[str, List[Tuple[int, int]]] = {}

@@ -24,6 +24,7 @@ import write_manifest as wm  # noqa: E402
 import compare_masking as cm  # noqa: E402
 import plot_pilot as pp  # noqa: E402
 import masking_gain as mg  # noqa: E402
+import label_agreement as la  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -275,6 +276,34 @@ class Plots(unittest.TestCase):
         self.assertIn("fig1_shared_clusters_by_threshold.png", made)
         self.assertIn("fig5_masking_overlap.pdf", made)
         self.assertNotIn("fig4_class_composition.png", made)   # no masking summary in this folder
+
+
+class LabelAgreement(unittest.TestCase):
+    """A: s 0-10 LTR (f1), s 20-30 DNA (f2). B: s 5-15 DNA (g1), s 20-30 DNA (g2), s 40-50 Unknown (g3)."""
+
+    def setUp(self):
+        self.a = [("s", 0, 10, "f1", "LTR/Gypsy"), ("s", 20, 30, "f2", "DNA/hAT")]
+        self.b = [("s", 5, 15, "g1", "DNA/TcMar"), ("s", 20, 30, "g2", "DNA/hAT"), ("s", 40, 50, "g3", "Unknown")]
+        self.m = la.class_matrix(self.a, self.b)
+
+    def test_class_matrix_cells(self):
+        self.assertEqual(self.m[("LTR", "DNA")], 5)        # 5-10
+        self.assertEqual(self.m[("LTR", "unmasked")], 5)   # 0-5
+        self.assertEqual(self.m[("DNA", "DNA")], 10)       # 20-30
+        self.assertEqual(self.m[("DNA", "unmasked")], 0)
+        self.assertEqual(self.m[("unmasked", "DNA")], 5)   # 10-15
+        self.assertEqual(self.m[("unmasked", "Unknown")], 10)
+
+    def test_agreement_counts_only_bases_masked_by_both(self):
+        self.assertEqual(la.agreement(self.m), (15, 10))
+
+    def test_discordant_family_pairs(self):
+        pairs = la.discordant_families(self.a, self.b)
+        self.assertEqual(dict(pairs), {("f1", "LTR/Gypsy", "g1", "DNA/TcMar"): 5})
+
+    def test_small_classes_are_grouped_as_other(self):
+        self.assertEqual([la.group(x) for x in ("Simple_repeat", "SINE?", "RC/Helitron", "LINE/L2", "Unknown")],
+                         ["Other", "Other", "Other", "LINE", "Unknown"])
 
 
 class MaskingGain(unittest.TestCase):
