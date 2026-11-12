@@ -25,6 +25,8 @@ import compare_masking as cm  # noqa: E402
 import plot_pilot as pp  # noqa: E402
 import masking_gain as mg  # noqa: E402
 import label_agreement as la  # noqa: E402
+import merge_libraries as ml  # noqa: E402
+import evaluate_merge as em  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -304,6 +306,84 @@ class LabelAgreement(unittest.TestCase):
     def test_small_classes_are_grouped_as_other(self):
         self.assertEqual([la.group(x) for x in ("Simple_repeat", "SINE?", "RC/Helitron", "LINE/L2", "Unknown")],
                          ["Other", "Other", "Other", "LINE", "Unknown"])
+
+
+def _m(name, label, length, source):
+    family = name
+    return ml.Member(f"{family}#{label}", family, label, label.split("/")[0], length, source)
+
+
+class MergeLabelRule(unittest.TestCase):
+    def test_a_no_classified_member_stays_unknown(self):
+        rep = _m("A1", "Unknown", 900, "RI_v1")
+        self.assertEqual(ml.cluster_label([rep, _m("B1", "Unknown", 500, "RI_v3")], rep), ("Unknown", "a"))
+
+    def test_b_unknown_members_inherit_the_agreed_class(self):
+        rep = _m("A1", "Unknown", 900, "RI_v1")
+        group = [rep, _m("B1", "DNA/hAT-Ac", 500, "RI_v2"), _m("C1", "DNA/hAT-Ac", 400, "RI_v3"), _m("C2", "DNA/TcMar", 300, "RI_v3")]
+        self.assertEqual(ml.cluster_label(group, rep), ("DNA/hAT-Ac", "b"))
+
+    def test_b_keeps_the_representatives_full_label_when_its_class_is_chosen(self):
+        rep = _m("A1", "LTR/Pao", 900, "RI_v1")
+        group = [rep, _m("B1", "LTR/Gypsy", 500, "RI_v2"), _m("C1", "LTR/Gypsy", 400, "RI_v3")]
+        self.assertEqual(ml.cluster_label(group, rep), ("LTR/Pao", "b"))
+
+    def test_c_the_class_given_by_most_libraries_wins(self):
+        rep = _m("A1", "DNA/hAT-Ac", 900, "RI_v1")
+        group = [rep, _m("B1", "LTR/Gypsy", 500, "RI_v2"), _m("C1", "LTR/Gypsy", 400, "RI_v3")]
+        self.assertEqual(ml.cluster_label(group, rep), ("LTR/Gypsy", "c"))
+
+    def test_libraries_are_counted_not_families(self):
+        rep = _m("A1", "DNA/hAT-Ac", 900, "RI_v1")
+        group = [rep, _m("C1", "LTR/Gypsy", 500, "RI_v3"), _m("C2", "LTR/Gypsy", 400, "RI_v3")]
+        self.assertEqual(ml.cluster_label(group, rep), ("DNA/hAT-Ac", "d"))   # one library each: a tie
+
+    def test_d_tie_without_the_representative_goes_to_the_longest_member(self):
+        rep = _m("A1", "Unknown", 900, "RI_v1")
+        group = [rep, _m("B1", "LTR/Gypsy", 500, "RI_v2"), _m("C1", "DNA/hAT-Ac", 800, "RI_v3")]
+        self.assertEqual(ml.cluster_label(group, rep), ("DNA/hAT-Ac", "d"))
+
+
+class MergeOutputs(unittest.TestCase):
+    def test_headers_table_and_coverage(self):
+        members = {m.name: m for m in (_m("A1", "Unknown", 900, "RI_v1"), _m("B1", "LTR/Gypsy", 450, "RI_v2"),
+                                       _m("C1", "DNA/hAT-Ac", 300, "RI_v3"))}
+        clusters = {0: [c.ClusterMember(0, "A1#Unknown", 900, True, None), c.ClusterMember(0, "B1#LTR/Gypsy", 450, False, 91.5)],
+                    1: [c.ClusterMember(1, "C1#DNA/hAT-Ac", 300, True, None)]}
+        alignments = {"B1#LTR/Gypsy": (450, 1, 10, 459, "-")}
+        headers, table, rules = ml.build_outputs(clusters, members, alignments)
+        self.assertEqual(headers, [("A1#LTR/Gypsy", "A1#Unknown"), ("C1#DNA/hAT-Ac", "C1#DNA/hAT-Ac")])
+        self.assertEqual(rules, {"b": 2})
+        b1 = next(r for r in table if r[1] == "B1#LTR/Gypsy")
+        self.assertEqual(b1[5:], ["91.50", "100.0", "LTR/Gypsy", "LTR/Gypsy", "b", "no"])
+
+
+class MergedVersionLookup(unittest.TestCase):
+    def test_a_merged_version_uses_its_own_library(self):
+        import tempfile
+        root = Path(tempfile.mkdtemp())
+        lib = root / "RI_v4" / "library"
+        lib.mkdir(parents=True)
+        (lib / "RI_v4-families.prefixed.fa").write_text(">A1#LTR/Gypsy\nACGT\n")
+        (lib / "merge_record.json").write_text("{}")
+        saved = c.version_folder
+        c.version_folder = lambda version: root / version
+        try:
+            build_id, original, prefixed = c.library_files("RI_v4")
+        finally:
+            c.version_folder = saved
+        self.assertEqual((build_id, original, prefixed), ("RI_v4", lib / "RI_v4-families.prefixed.fa", lib / "RI_v4-families.prefixed.fa"))
+
+
+class MergeEffect(unittest.TestCase):
+    def test_lost_and_gained_against_the_union_of_sources(self):
+        merged = [("s", 0, 40, "m1", "LTR/Gypsy", 500), ("s", 90, 100, "m2", "DNA/hAT", 100)]
+        sources = [[("s", 0, 50, "a1", "LTR/Gypsy", 400)], [("s", 30, 60, "b1", "DNA/hAT", 300)]]
+        e = em.merge_effect(merged, sources)
+        self.assertEqual((e["merged"], e["union"], e["both"], e["lost"], e["gained"]), (50, 60, 40, 20, 10))
+        self.assertEqual(e["lost_by_class"].get("LTR"), 10)    # 40-50 is LTR in the sources (score 400 beats 300)
+        self.assertEqual(e["lost_by_class"].get("DNA"), 10)    # 50-60
+        self.assertEqual(e["gained_by_class"].get("DNA"), 10)  # 90-100
 
 
 class OneLabelPerBase(unittest.TestCase):

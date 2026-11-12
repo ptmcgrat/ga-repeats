@@ -101,12 +101,20 @@ def panel_accession(assembly_id: str, panel: str = PANEL_VERSION) -> str:
 
 
 def library_files(version: str) -> Tuple[str, Path, Path]:
-    """(build assembly id, original families file, prefixed families file) of a version."""
+    """(build assembly id, original families file, prefixed families file) of a version.
+
+    A merged version (merge_libraries.py) has no single build assembly: its library is
+    <version>-families.prefixed.fa, its names already carry their sources, and its
+    library/ holds merge_record.json. For it, the build id is the version and the
+    "original" file is the merged library itself.
+    """
     lib = version_folder(version) / "library"
     prefixed = sorted(lib.glob("*-families.prefixed.fa"))
     if len(prefixed) != 1:
         stop(f"expected one *-families.prefixed.fa in {lib}, found {len(prefixed)}")
     build_id = prefixed[0].name[: -len("-families.prefixed.fa")]
+    if build_id == version and (lib / "merge_record.json").exists():
+        return build_id, prefixed[0], prefixed[0]
     original = lib / f"{build_id}-families.fa"
     if not original.exists():
         stop(f"missing {original}")
@@ -214,6 +222,22 @@ def parse_clstr(path: Path) -> List[ClusterMember]:
             members.append(ClusterMember(cluster, name, int(length), star == "*",
                                          None if star else float(ident)))
     return members
+
+
+_CLSTR_ALIGN = re.compile(r"^\d+\t\d+nt, >(.+?)\.\.\. at (\d+):(\d+):(\d+):(\d+)/([+-])/[\d.]+%\s*$")
+
+
+def clstr_alignments(path: Path) -> Dict[str, Tuple[int, int, int, int, str]]:
+    """Member name -> (start, end on the member, start, end on the representative, strand),
+    from a cd-hit-est .clstr written with local alignment (-G 0). Representatives are absent."""
+    out: Dict[str, Tuple[int, int, int, int, str]] = {}
+    with open(path) as handle:
+        for line in handle:
+            match = _CLSTR_ALIGN.match(line.rstrip("\n"))
+            if match:
+                name, qs, qe, rs, re_, strand = match.groups()
+                out[name] = (int(qs), int(qe), int(rs), int(re_), strand)
+    return out
 
 
 def word_size(identity: float) -> int:
