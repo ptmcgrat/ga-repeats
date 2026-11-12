@@ -306,6 +306,28 @@ class LabelAgreement(unittest.TestCase):
                          ["Other", "Other", "Other", "LINE", "Unknown"])
 
 
+class OneLabelPerBase(unittest.TestCase):
+    def test_simple_repeat_inside_a_transposon_keeps_the_transposon_label(self):
+        rows = [("s", 0, 100, "f1", "LTR/Gypsy", 500), ("s", 40, 60, "(CA)n", "Simple_repeat", 30)]
+        self.assertEqual(la.one_label_per_base(rows), [("s", 0, 100, "f1", "LTR/Gypsy")])
+
+    def test_overlapping_hits_split_at_the_higher_score(self):
+        rows = [("s", 0, 60, "fa", "DNA/hAT", 300), ("s", 50, 100, "fb", "LTR/Gypsy", 400)]
+        self.assertEqual(la.one_label_per_base(rows), [("s", 0, 50, "fa", "DNA/hAT"), ("s", 50, 100, "fb", "LTR/Gypsy")])
+
+    def test_equal_scores_go_to_the_longer_annotation_and_gaps_stay_unmasked(self):
+        rows = [("s", 0, 30, "short", "DNA", 200), ("s", 10, 80, "long", "LINE/L2", 200), ("s", 90, 95, "g", "Unknown", 50)]
+        self.assertEqual(la.one_label_per_base(rows),
+                         [("s", 0, 10, "short", "DNA"), ("s", 10, 80, "long", "LINE/L2"), ("s", 90, 95, "g", "Unknown")])
+
+    def test_no_base_is_counted_twice_in_the_matrix(self):
+        a = la.one_label_per_base([("s", 0, 100, "f1", "LTR/Gypsy", 500), ("s", 40, 60, "(CA)n", "Simple_repeat", 30)])
+        b = la.one_label_per_base([("s", 0, 100, "g1", "DNA/hAT", 400)])
+        m = la.class_matrix(a, b)
+        self.assertEqual(la.agreement(m), (100, 0))
+        self.assertNotIn(("Other", "DNA"), m)
+
+
 class MaskingGain(unittest.TestCase):
     """On a 100-bp genome: v1 masks 0-30 (DNA), v2 20-50 (LTR), v3 40-60 (Unknown); together 0-60."""
 

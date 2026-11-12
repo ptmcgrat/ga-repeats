@@ -10,6 +10,9 @@ On one genome masked by two or more libraries, for every pair A, B:
     largest first: the families to inspect or curate.
 Classes are grouped as DNA, LINE, LTR, SINE, Unknown and Other (everything else, including
 RepeatMasker's own Simple_repeat and Low_complexity).
+Each base gets one label per library: that of the highest-scoring annotation covering it (RepeatMasker's
+own precedence for overlapping hits; ties go to the longer annotation). RepeatMasker can give a base two
+annotations, for example a simple repeat inside a transposon; counting both would count the base twice.
 
 Inputs: <version folder>/masked/<assembly>/<assembly>.bed (made by mask_genomes.py).
 Results: <scratch>/comparisons/label_agreement/<assembly>_<A>_vs_<B>.tsv (class matrix),
@@ -22,6 +25,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import heapq
 import itertools
 import sys
 from collections import defaultdict
@@ -35,6 +39,7 @@ import _common as c  # noqa: E402
 GROUPS = ["DNA", "LINE", "LTR", "SINE", "Unknown", "Other"]
 UNMASKED = "unmasked"
 Row = Tuple[str, int, int, str, str]   # sequence, start, end, family, full label
+Scored = Tuple[str, int, int, str, str, int]   # the same, plus RepeatMasker's alignment (SW) score
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -52,15 +57,52 @@ def group(label: str) -> str:
     return cls if cls in GROUPS else "Other"
 
 
-def read_labelled_bed(path: Path) -> List[Row]:
+def read_labelled_bed(path: Path) -> List[Scored]:
     rows = []
     with open(path) as handle:
         for line in handle:
             if line.startswith("#"):
                 continue
             f = line.rstrip("\n").split("\t")
-            rows.append((f[0], int(f[1]), int(f[2]), f[3], f[6]))
+            rows.append((f[0], int(f[1]), int(f[2]), f[3], f[6], int(float(f[8]))))
     return rows
+
+
+def one_label_per_base(rows: List[Scored]) -> List[Row]:
+    """Non-overlapping rows: each masked base keeps only its highest-scoring annotation (ties: the longer one)."""
+    by_seq: Dict[str, List[Scored]] = defaultdict(list)
+    for r in rows:
+        by_seq[r[0]].append(r)
+    out: List[Row] = []
+    for name, items in by_seq.items():
+        items.sort(key=lambda r: r[1])
+        points = sorted({p for r in items for p in (r[1], r[2])})
+        heap: list = []
+        i = 0
+        open_seg = None   # [start, end, family, label] of the segment being extended
+        for k in range(len(points) - 1):
+            x, nxt = points[k], points[k + 1]
+            while i < len(items) and items[i][1] <= x:
+                _n, start, end, family, label, score = items[i]
+                heapq.heappush(heap, (-score, -(end - start), family, end, label))
+                i += 1
+            while heap and heap[0][3] <= x:
+                heapq.heappop(heap)
+            if not heap:
+                if open_seg:
+                    out.append((name, *open_seg))
+                    open_seg = None
+                continue
+            family, label = heap[0][2], heap[0][4]
+            if open_seg and open_seg[1] == x and open_seg[2] == family and open_seg[3] == label:
+                open_seg[1] = nxt
+            else:
+                if open_seg:
+                    out.append((name, *open_seg))
+                open_seg = [x, nxt, family, label]
+        if open_seg:
+            out.append((name, *open_seg))
+    return [tuple(r) for r in out]
 
 
 def group_sets(rows: List[Row]):
@@ -152,7 +194,9 @@ def main(argv=None) -> None:
     rows = {}
     for version, bed in beds.items():
         print(f"reading {version} ...", flush=True)
-        rows[version] = read_labelled_bed(bed)
+        raw = read_labelled_bed(bed)
+        rows[version] = one_label_per_base(raw)
+        print(f"  {len(raw):,} annotations -> {len(rows[version]):,} stretches with one label each", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for a, b in pairs:
@@ -179,6 +223,10 @@ def main(argv=None) -> None:
                     [[args.assembly, f"{a} vs {b}", fa, la, fb, lb, v, f"{100 * v / genome_bp:.4f}"]
                      for (fa, la, fb, lb), v in top])
         both, same = agreement(matrix)
+        direct = c.intersect_length(c.merge_by_sequence((r[0], r[1], r[2]) for r in rows[a]),
+                                    c.merge_by_sequence((r[0], r[1], r[2]) for r in rows[b]))
+        if both != direct:
+            c.stop(f"internal check failed: the class matrix holds {both} bp masked by both, the direct count {direct}")
         print(f"\n{args.assembly}, {a} vs {b}: masked by both {100 * both / genome_bp:.2f}% of the genome; "
               f"same class for {100 * same / both:.1f}% of those bases")
         for ga in GROUPS:
@@ -190,6 +238,7 @@ def main(argv=None) -> None:
         print(f"  largest disagreements (same bases, different class), of {len(families)} family pairs:")
         for (fa, la, fb, lb), v in top[:10]:
             print(f"    {fa} ({la})  vs  {fb} ({lb}): {v:,} bp")
+        print(f"  check passed: every base masked by both is counted once ({both:,} bp)")
         print(f"  written: {stem}.tsv and {stem}_families.tsv")
 
         if args.plot:
