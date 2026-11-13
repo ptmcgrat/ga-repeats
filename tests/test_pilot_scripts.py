@@ -355,7 +355,38 @@ class MergeOutputs(unittest.TestCase):
         self.assertEqual(headers, [("A1#LTR/Gypsy", "A1#Unknown"), ("C1#DNA/hAT-Ac", "C1#DNA/hAT-Ac")])
         self.assertEqual(rules, {"b": 2})
         b1 = next(r for r in table if r[1] == "B1#LTR/Gypsy")
-        self.assertEqual(b1[5:], ["91.50", "100.0", "LTR/Gypsy", "LTR/Gypsy", "b", "no"])
+        self.assertEqual(b1[5:], ["91.50", "100.0", "50.0", "LTR/Gypsy", "LTR/Gypsy", "b", "no"])   # 450 of 900 bp of A1
+
+
+class MergeCommand(unittest.TestCase):
+    def _command(self, *extra):
+        import io, contextlib, tempfile
+        captured = {}
+        saved = (c.run, c.library_files, c.read_families, c.version_folder)
+        tmp = Path(tempfile.mkdtemp())
+        def fake_run(command, go, log=None):
+            captured["command"] = list(command)
+            raise SystemExit(0)
+        c.run = fake_run
+        c.library_files = lambda v: (v, tmp / f"{v}.fa", tmp / f"{v}.fa")
+        c.read_families = lambda path: [c.Family(f"{path.stem}_f1#DNA", f"{path.stem}_f1", "DNA", "DNA", 100)]
+        c.version_folder = lambda v: tmp / "versions" / v
+        for v in ("RI_v1", "RI_v2"):
+            (tmp / f"{v}.fa").write_text(f">{v}_f1#DNA\nACGT\n")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+                ml.main(["--version", "RI_v9", "--sources", "RI_v1", "RI_v2", "--scratch", str(tmp / "scratch"), "--go", *extra])
+        finally:
+            c.run, c.library_files, c.read_families, c.version_folder = saved
+        return captured["command"]
+
+    def test_coverage_of_the_longer_sequence_is_passed_as_aL(self):
+        command = self._command("--coverage-longer", "0.8")
+        self.assertIn("-aL", command)
+        self.assertEqual(command[command.index("-aL") + 1], "0.80")
+
+    def test_without_the_option_no_aL_is_passed(self):
+        self.assertNotIn("-aL", self._command())
 
 
 class MergedVersionLookup(unittest.TestCase):

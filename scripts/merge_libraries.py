@@ -3,14 +3,17 @@
 
 1. pool the sources' prefixed libraries (each family name already carries its build assembly);
 2. cluster with cd-hit-est as compare_libraries.py does: local identity (-G 0), an identity
-   threshold (-c) and a minimum alignment coverage of the shorter sequence (-aS);
+   threshold (-c) and a minimum alignment coverage of the shorter sequence (-aS); optionally also
+   of the longer sequence (-aL, --coverage-longer), so that a short family contained in a long one
+   (a nested insertion, or a chimeric consensus) stays a family of its own;
 3. keep cd-hit-est's representative of each cluster (its longest member);
 4. give each cluster a label by the rule below and write it into the representative's header;
 5. move the results into the new version's library/ folder:
      <version>-families.prefixed.fa   the merged library (what mask_genomes.py uses)
-     cluster_table.tsv                every family: source, cluster, representative, identity and
-                                      coverage to the representative, its own label, the cluster's
-                                      label and the rule that decided it
+     cluster_table.tsv                every family: source, cluster, representative, identity to the
+                                      representative, how much of the family and of the representative
+                                      the alignment covers, its own label, the cluster's label and the
+                                      rule that decided it
      merge_record.json                sources and their library sha256, thresholds, commands, counts
 
 Label rule (provisional, for the merge rehearsal; recorded in merge_record.json):
@@ -28,6 +31,7 @@ Work happens in <scratch>/<version>/merge/; the version folder must not exist ye
 Example:
   python scripts/merge_libraries.py --version RI_v4 --sources RI_v1 RI_v2 RI_v3            # dry run
   python scripts/merge_libraries.py --version RI_v4 --sources RI_v1 RI_v2 RI_v3 --go
+  python scripts/merge_libraries.py --version RI_v5 --sources RI_v1 RI_v2 RI_v3 --coverage-longer 0.80 --go
 """
 from __future__ import annotations
 
@@ -65,6 +69,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--identity", type=float, default=0.80, help="cd-hit-est identity threshold (default 0.80)")
     parser.add_argument("--coverage", type=float, default=0.80,
                         help="minimum alignment coverage of the shorter sequence, cd-hit-est -aS (default 0.80)")
+    parser.add_argument("--coverage-longer", type=float, default=None,
+                        help="minimum alignment coverage of the longer sequence, cd-hit-est -aL (default: not used)")
     c.add_common_args(parser)
     return parser.parse_args(argv)
 
@@ -99,10 +105,19 @@ def cluster_label(members: Sequence[Member], representative: Member) -> Tuple[st
 
 
 def coverage_of(member: Member, alignment: Optional[Tuple[int, int, int, int, str]]) -> Optional[float]:
+    """Percent of the member covered by its alignment to the representative."""
     if alignment is None:
         return None
     qs, qe = alignment[0], alignment[1]
     return 100 * (abs(qe - qs) + 1) / member.length
+
+
+def coverage_of_representative(representative: Member, alignment: Optional[Tuple[int, int, int, int, str]]) -> Optional[float]:
+    """Percent of the representative covered by a member's alignment to it."""
+    if alignment is None:
+        return None
+    rs, re_ = alignment[2], alignment[3]
+    return 100 * (abs(re_ - rs) + 1) / representative.length
 
 
 def build_outputs(clusters: Dict[int, List[c.ClusterMember]], members: Dict[str, Member],
@@ -122,9 +137,10 @@ def build_outputs(clusters: Dict[int, List[c.ClusterMember]], members: Dict[str,
         for cm in cms:
             m = members[cm.name]
             cov = coverage_of(m, alignments.get(cm.name))
+            rcov = coverage_of_representative(rep, alignments.get(cm.name))
             table.append([cluster, m.name, m.source, m.length, "yes" if cm.representative else "no",
                           "" if cm.identity is None else f"{cm.identity:.2f}", "" if cov is None else f"{cov:.1f}",
-                          m.label, label, rule, "yes" if rule in ("c", "d") else "no"])
+                          "" if rcov is None else f"{rcov:.1f}", m.label, label, rule, "yes" if rule in ("c", "d") else "no"])
     return headers, table, rules
 
 
@@ -149,6 +165,8 @@ def main(argv=None) -> None:
     if args.version in args.sources:
         c.stop("the merged version must be a new version")
     c.word_size(args.identity)  # raises for thresholds cd-hit-est cannot use
+    if args.coverage_longer is not None and not 0 < args.coverage_longer <= 1:
+        c.stop("--coverage-longer is a fraction between 0 and 1, e.g. 0.80")
 
     members: Dict[str, Member] = {}
     sources = []
@@ -167,7 +185,8 @@ def main(argv=None) -> None:
     work = args.scratch / args.version / "merge"
     print(f"new version {args.version}: {target}")
     print(f"work folder: {work}")
-    print(f"cd-hit-est: identity {args.identity:.2f}, coverage of the shorter sequence {args.coverage:.2f}, local alignment")
+    longer = "" if args.coverage_longer is None else f", of the longer sequence {args.coverage_longer:.2f}"
+    print(f"cd-hit-est: identity {args.identity:.2f}, coverage of the shorter sequence {args.coverage:.2f}{longer}, local alignment")
     if target.exists():
         c.stop(f"{target} already exists; a version is never changed")
     if work.exists():
@@ -188,6 +207,7 @@ def main(argv=None) -> None:
     prefix = work / f"cdhit_c{args.identity:.2f}"
     command = c.container(args.sif, c.CDHIT_EST, "-i", str(pooled), "-o", str(prefix) + ".fa",
                           "-c", f"{args.identity:.2f}", "-G", "0", "-aS", f"{args.coverage:.2f}",
+                          *(["-aL", f"{args.coverage_longer:.2f}"] if args.coverage_longer is not None else []),
                           "-n", str(c.word_size(args.identity)), "-g", "1", "-r", "1", "-d", "0", "-M", "0",
                           "-T", str(args.threads))
     c.run(command, True, work / "cdhit.log")
@@ -211,12 +231,14 @@ def main(argv=None) -> None:
             handle.write(f">{header}\n" + "".join(seq[i:i + 60] + "\n" for i in range(0, len(seq), 60)))
     c.write_tsv(work / "cluster_table.tsv",
                 ["cluster", "family", "source", "length", "representative", "identity_to_representative",
-                 "coverage_of_family", "family_label", "cluster_label", "rule", "conflict"], table)
+                 "coverage_of_family", "coverage_of_representative", "family_label", "cluster_label", "rule",
+                 "conflict"], table)
 
     cdhit_version = next((line.strip() for line in open(work / "cdhit.log") if "CD-HIT version" in line), None)
     record = {
         "version": args.version, "kind": "merged library", "sources": sources,
-        "cd_hit_est": {"identity": args.identity, "coverage_of_shorter": args.coverage, "alignment": "local (-G 0)",
+        "cd_hit_est": {"identity": args.identity, "coverage_of_shorter": args.coverage,
+                       "coverage_of_longer": args.coverage_longer, "alignment": "local (-G 0)",
                        "version_line": cdhit_version, "command": c.shell_text(command)},
         "label_rule": RULE_TEXT,
         "counts": {"families_in": len(members), "clusters": len(clusters), "by_rule": dict(sorted(rules.items())),
