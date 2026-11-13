@@ -27,6 +27,7 @@ import masking_gain as mg  # noqa: E402
 import label_agreement as la  # noqa: E402
 import merge_libraries as ml  # noqa: E402
 import evaluate_merge as em  # noqa: E402
+import gene_overlap as go  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -415,6 +416,42 @@ class MergeEffect(unittest.TestCase):
         self.assertEqual(e["lost_by_class"].get("LTR"), 10)    # 40-50 is LTR in the sources (score 400 beats 300)
         self.assertEqual(e["lost_by_class"].get("DNA"), 10)    # 50-60
         self.assertEqual(e["gained_by_class"].get("DNA"), 10)  # 90-100
+
+
+GFF = [
+    "##gff-version 3\n",
+    "s1\tRefSeq\tgene\t1\t500\t.\t+\t.\tID=gene-g1;gene=g1\n",
+    "s1\tGnomon\tCDS\t11\t100\t.\t+\t0\tID=cds-1;Parent=rna-1;gene=g1;product=myosin%2C heavy chain\n",
+    "s1\tGnomon\tCDS\t51\t150\t.\t+\t0\tID=cds-2;Parent=rna-2;gene=g1;product=myosin%2C heavy chain\n",
+    "s1\tGnomon\tCDS\t301\t400\t.\t+\t0\tID=cds-3;Parent=rna-3;gene=t1;product=transposase-like protein\n",
+    "s1\tGnomon\texon\t1\t500\t.\t+\t.\tID=exon-1;Parent=rna-1;gene=g1\n",
+]
+
+
+class GeneOverlap(unittest.TestCase):
+    def setUp(self):
+        self.genes = go.read_cds(GFF)
+
+    def test_cds_merged_across_transcripts_and_products_decoded(self):
+        self.assertEqual(self.genes["g1"]["spans"], {"s1": [(10, 150)]})
+        self.assertEqual(self.genes["g1"]["product"], "myosin, heavy chain")
+        self.assertFalse(self.genes["g1"]["te_like"])
+        self.assertTrue(self.genes["t1"]["te_like"])
+
+    def test_masked_cds_by_class_family_and_gene(self):
+        rows = [("s1", 0, 40, "fA", "Unknown"), ("s1", 140, 160, "fB", "Simple_repeat"), ("s1", 300, 400, "fC", "DNA/hAT")]
+        classes, families, per_gene = go.summarise(self.genes, rows)
+        total, by_class = classes["genes without TE products"]
+        self.assertEqual((total, by_class), (140, {"Unknown": 30, "Other": 10}))
+        self.assertEqual(classes["genes with TE products"], (100, {"DNA": 100}))
+        self.assertEqual(families[("fA", "Unknown")], {"bp": 30, "genes": ["g1"], "te_genes": 0})
+        self.assertEqual(families[("fC", "DNA/hAT")]["te_genes"], 1)
+        self.assertEqual(per_gene["g1"], ("myosin, heavy chain", False, 140, 40, ("fA", "Unknown")))
+
+    def test_te_product_words(self):
+        for product, expected in (("reverse transcriptase", True), ("Pol polyprotein", True), ("piggyBac transposable element-derived protein 4", True),
+                                  ("hatching enzyme", False), ("polymerase delta", False), ("integrin beta-1", False)):
+            self.assertEqual(bool(go.TE_PRODUCT.search(product)), expected, product)
 
 
 class OneLabelPerBase(unittest.TestCase):

@@ -97,8 +97,10 @@ def mask_one(args: argparse.Namespace, assembly: str, library: Path, pa: int) ->
         "outputs": [str(dest / f"{assembly}.out"), str(dest / f"{assembly}.bed")],
     }
     (work / "run_record.json").write_text(json.dumps(record, indent=2) + "\n")
+    minutes = int((datetime.now() - started).total_seconds() // 60)
     return (f"{assembly}: {len(hits)} annotations, {masked_bp:,} of {genome_bp:,} bp masked "
-            f"({100 * masked_bp / genome_bp:.2f}%); BED check passed; copied to {dest}")
+            f"({100 * masked_bp / genome_bp:.2f}%); BED check passed; copied to {dest}; "
+            f"run time {minutes // 60}:{minutes % 60:02d}")
 
 
 def main(argv=None) -> None:

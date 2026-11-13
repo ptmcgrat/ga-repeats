@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.11, 2026-11-06 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop)
+**Document version:** 0.12, 2026-11-13 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun)
 **Owner:** McGrath lab
-**Status:** question 1 pilot: libraries built (`RI_v1`–`RI_v3`); comparisons and masking next, with `repeats_009`; **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -143,10 +143,13 @@ Written under the data root, in a **version folder that is never overwritten**:
 - The **library itself** is an output of this project, but no contract lists it yet (section 7).
 - **Question 1 pilot (decision 2026-10-28):** `RI_v1` (library built from MZ_MZ4f), `RI_v2` (MZ_NMetZ), `RI_v3` (YH_YH2f).
   Each `MANIFEST.yaml` also records `purpose: question 1 pilot`, the TETools image tag and its `sha256`, the Apptainer
-  and `ga_common` versions and the random seed. Each library masks its own build genome and DT_004f, the held-out genome (six runs common to
-  every design); whether each also masks the other pilot genomes is open (section 7). The final library is the next `RI_vN`.
-- When libraries are merged, `library/` also holds the **cluster table**: every original family name, its source, its
-  cluster, the representative, identity and coverage.
+  and `ga_common` versions and the random seed. Each library masks its own build genome and DT_004f, the held-out genome;
+  two cross runs (`RI_v1` on YH_YH2f, `RI_v3` on MZ_MZ4f) separate lineage from run (section 6). The final library is the next `RI_vN`.
+- A **merged version** (`merge_libraries.py`) has no single build genome. Its `library/` holds the merged library
+  `<version>-families.prefixed.fa`, the **cluster table** `cluster_table.tsv` (every original family name, its source, its
+  cluster, the representative, identity, how much of the family and of the representative the alignment covers, the
+  family's own label, the cluster's label and the rule that set it) and `merge_record.json` (the sources and their library
+  sha256, thresholds, command and counts).
 - **Masked genomes are not stored** (owner, 2026-10-30, answered through the coordinator). A soft- or hard-masked genome is
   regenerated on demand from `Genomes/<assembly_id>/<accession_version>/genome.fna.gz` and the BED; the coordinator adds a
   regeneration helper to the common library when a consuming project asks for a form.
@@ -193,8 +196,20 @@ manifests by the scripts of `repeats_009`, so no further step is manual; usage i
    they mask, and DT_004f's masked fraction under each library; plots of genome-wide class composition per genome and
    library (after Quah et al. Fig. 7A, genome-wide half only: the structural-variant half needs another project's calls).
 
-**Final library** (decision 2026-10-28): the de novo library is merged with Repbase at the final masking stage only, with
-the same de-duplication; which Repbase taxa are retained is open (section 7). The final build is scripted.
+**Merging** (decided 2026-11-13, after the rehearsals `RI_v4` and `RI_v5`; `merge_libraries.py`): the libraries' prefixed
+families are pooled and clustered with cd-hit-est at 0.80 identity with local alignment (`-c 0.80 -G 0`), the alignment
+covering at least 80% of both the shorter and the longer sequence (`-aS 0.80 -aL 0.80`); cd-hit-est's representative (the
+longest member) is kept. Each cluster's label: (a) no classified member: Unknown; (b) classified members of one class: that
+class, and Unknown members inherit it; (c) disagreeing members: the class given by the most source libraries; (d) a tie:
+the representative's class if it is among the tied, else that of the longest classified member among them. The full label
+(class/superfamily) is the representative's when its class is chosen, else the most frequent among the members of that
+class. Clusters decided by (c) or (d) are flagged and inspected by hand. Requiring coverage of the longer sequence keeps a
+family contained in a longer one (a nested insertion, or a chimeric consensus) as a family of its own: without it
+(`RI_v4`), 30 classified families were relabelled by much shorter members they contained.
+
+**Final library**: built from one assembly per ecogroup, seven libraries in total, merged as above (decision 2026-11-11);
+merged with Repbase at the final masking stage only, with the same de-duplication (decision 2026-10-28). Which assemblies,
+and which Repbase taxa, are open (section 7). The final build is scripted.
 
 The plan (outputs, formats, checks) is agreed with the owner and recorded here **before any
 code is written**.
@@ -322,6 +337,12 @@ has tried.
 | 2026-11-05 | No manual steps: work runs in scratch (`~/scratch/ga-repeats`), and scripts move finished results into the version folder and write each `MANIFEST.yaml`; the comparisons, masking and manifests use the scripts of `repeats_009` (replacing "the pilot is run by hand" for these steps) | the owner wants no manual operations; building in scratch and moving into place only after checks is the coordinator's own pattern (coordinator specification, section 5) and keeps temporary files out of Dropbox; owner |
 | 2026-11-05 | Long jobs run in `screen`, at 16 threads each, under `nice -n 10` | three runs use half of mzebra's 96 cores; a lost connection does not stop a run; student |
 | 2026-11-06 | The student applies zips on the laptop and pushes to GitHub; mzebra only pulls (`git pull --ff-only`) | GitHub stays the backup and the server is never ahead of it; the shared server account does not commit; owner |
+| 2026-11-09 | Cross-genome masking: `RI_v1` on YH_YH2f and `RI_v3` on MZ_MZ4f only, not all six cross runs | enough to tell whether YH_YH2f's lower LTR total is lineage or run; owner and student |
+| 2026-11-11 | **Question 1:** the final library is built from one assembly per ecogroup, seven in total, RepeatModeler run on each | the pilot (section 8): lineage does not limit what a library masks, but each further library adds masked sequence, with diminishing returns (+2.41, then +1.16 points of DT_004f); owner and student |
+| 2026-11-12 | Merge rehearsal `RI_v4`: `RI_v1`–`RI_v3` merged (0.80 identity, 80% of the shorter sequence, local alignment, label rule a–d), DT_004f masked | test the merge before seven libraries depend on it; student |
+| 2026-11-13 | The owner leaves the project's decisions to the student | stated by the student; whether this covers the decisions this document reserves to the owner by name is to be confirmed (section 7) |
+| 2026-11-13 | Merge rehearsal `RI_v5`: as `RI_v4`, plus 80% coverage of the longer sequence (`-aL 0.80`) | in `RI_v4`, short families contained in long ones (nested insertions, chimeric consensus sequences) joined their clusters and relabelled them; student |
+| 2026-11-13 | Merge settings for the final build: those of `RI_v5` (section 4, Merging) | `RI_v5`: conflicting clusters 132 → 16, no classified family relabelled, labels agree with each source on 86–87% of shared sequence, 99.4% of the sources' masking kept (43.91% of DT_004f, against 44.15%); 5,288 families against 3,849; student |
 
 ---
 
@@ -331,13 +352,16 @@ has tried.
 |---|---|
 | Contract for the shared library, and exact fields of the `repeats` contract (class and family naming, divergence, BED columns) | before first integration |
 | Keep the existing family names, or take the names the recreated library gives? | no |
-| **Question 1:** which genomes build the final library? The pilot is agreed (section 6); open are the "new family" thresholds (set after the pilot) and the build set that follows from the result | **yes, before the final library build** |
-| **Question 2:** what completeness measurements, per TE class, and what counts as good enough (briefing, Part C)? Includes the unknown fraction and DNA, SINE and LTR/Unknown families | **yes, before the library is accepted** |
+| **Question 1:** answered (section 6, 2026-11-11): one assembly per ecogroup. Open: which assembly in each ecogroup; whether `RI_v1` (mbuna) and `RI_v3` (deep benthic) serve as two of the seven; and which genome is held out to check the final library if the Diplotaxodon library is built from DT_004f. The pilot's "new family" thresholds changed none of its conclusions (0.80–0.95), so no separate rule is set | **yes, before the final library build** |
+| **Question 2:** what completeness measurements, per TE class, and what counts as good enough (briefing, Part C)? Includes the unknown fraction and DNA, SINE and LTR/Unknown families. Begun on `RI_v5` (section 8): coding sequence masked on DT_005m; the known insertions (*rx1*, *tbx2a*, *mitfa*, *fhl2b*); class shares on AC_fAstCal68 against Quah et al.; labels against Repbase | **yes, before the library is accepted** |
+| Does the owner's delegation (2026-11-13) cover the decisions this document reserves to him by name: the build set, the completeness criteria, tool versions and library sources? | before the final library build |
+| `write_manifest.py` for merged versions (`RI_v4`, `RI_v5`, the final library): there is no RepeatModeler run; the manifest records the sources, the merge settings and the merge record | before merged versions are synced |
+| Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
+| The earlier RepeatMasker annotation of LG2, LG10 and LG13 in seven annotated assemblies (an old RepeatMasker, a library from GT3a alone): another de novo library, so not an accuracy reference; worth a consistency comparison? | no |
 | Repbase merge (decided, section 6): which Repbase taxa are retained? The owner and the student decide | before the final masking |
 | **Satellites and other tandem repeats:** does project 1 build and annotate them, or project 2b (centromeres, arrays)? (relayed to the coordinator) | before the library is accepted |
 | Library policy for new panels: frozen or rebuilt? | before P2 |
 | Is the YH LG10 Y haplotig (`YH_LG10Y`, held beside the panel) masked too? | no |
-| Pilot masked set: the six runs common to every design (each library on its own genome and on DT_004f) may run. Are the cross-genome runs all six more (12 in total, symmetric), or only those briefing B4 strictly needs (7 or 8 in total)? | before the cross-genome masking |
 | For the coordinator: AS_Sanger (`fAulStu2.1`) and AS_SAMEA123396442 (`fAulStu2.pri`) carry the same specimen name. Same individual? | before AS is used |
 | Permanent place for comparison results: a `comparisons/` folder under `RepeatInformation` would need the coordinator to add it to `ga_common.paths` and `sync.py`; until then they stay in scratch | before the pilot is reported |
 
@@ -345,23 +369,43 @@ has tried.
 
 ## 8. Status
 
-First conversation done (2026-10-28); the owner's decisions are in section 6. The 25 P1 genomes are confirmed in the data
-root on mzebra. Container set up: TETools 2.01 (`sha256` 8b805d16d279eb57e4948719d2acd8dcd75b31b5ce22fbadcd3a522307fe97ca) under
-Apptainer 1.5.3 in `ga-repeats`; RepeatModeler 2.0.9 and RepeatMasker 4.2.6 confirmed from the tools' own output.
+First conversation done (2026-10-28); decisions in section 6. The 25 P1 genomes are in the data root on mzebra. Container:
+TETools 2.01 (`sha256` 8b805d16d279eb57e4948719d2acd8dcd75b31b5ce22fbadcd3a522307fe97ca) under Apptainer 1.5.3 in `ga-repeats`;
+RepeatModeler 2.0.9, RepeatMasker 4.2.6 and CD-HIT 4.8.1, confirmed from the tools' own output.
 
-**Libraries built** (copied into their version folders 2026-11-05; manifests not yet written):
+**Versions** (manifests not yet written; nothing synced to Dropbox):
 
-| version | built from | families | seed | run time | BuildDatabase |
-|---|---|---|---|---|---|
-| `RI_v1` | MZ_MZ4f | 2,396 (1,787 RepeatScout/RECON + 848 LTR pipeline − 239 redundant) | 1793333684 | 36:14:33 | 61 sequences, 972,958,384 bp |
-| `RI_v2` | MZ_NMetZ | 2,398 (1,782 + 862 − 246) | 1793758093 | 33:53:39 | 75 sequences, 959,220,039 bp |
-| `RI_v3` | YH_YH2f | 2,306 (1,773 + 693 − 160) | 1793758241 | 38:42:38 | 69 sequences, 976,509,173 bp |
+| version | what | families | DT_004f masked |
+|---|---|---|---|
+| `RI_v1` | RepeatModeler on MZ_MZ4f (seed 1793333684, 36:14:33; BuildDatabase 61 sequences, 972,958,384 bp) | 2,396 | 40.81% |
+| `RI_v2` | RepeatModeler on MZ_NMetZ (seed 1793758093, 33:53:39; 75 sequences, 959,220,039 bp) | 2,398 | 40.33% |
+| `RI_v3` | RepeatModeler on YH_YH2f (seed 1793758241, 38:42:38; 69 sequences, 976,509,173 bp) | 2,306 | 40.60% |
+| `RI_v4` | merge of `RI_v1`–`RI_v3`, `-aS 0.80` (rehearsal) | 3,849 | 43.72% |
+| `RI_v5` | merge of `RI_v1`–`RI_v3`, `-aS 0.80 -aL 0.80` (rehearsal; the final build's settings) | 5,288 | 43.91% |
 
-Each ran five rounds with 16 threads and reached about 42% database coverage by the log's final coverage line; all three
-were classified against the same Dfam 4.0 reference.
-**Next:** install `repeats_009`; the comparisons (`RI_v1` with `RI_v2`, `RI_v1` with `RI_v3`); the six masking runs common to
-every design; the owner's decision on the cross-genome runs; the summaries; the manifests; `sync.py push`. Nothing is ready
-to integrate.
+Each RepeatModeler run: five rounds, 16 threads, about 42% database coverage, classified against Dfam 4.0. Masked
+percentages include RepeatMasker's own simple repeats and low-complexity sequence.
+
+**Question 1 pilot, results** (`repeats_009`–`repeats_014`; the comparison results stay in scratch, section 7):
+- Families: 36% of family groups hold families from both libraries within species, 32% between lineages (cd-hit-est,
+  0.80); the 4-point gap holds from 0.80 to 0.95. 95–96% of families have a match in the other library, 57–62% over at
+  least 80% of their length.
+- Masking: every library masks every genome at 39.9–41.6%; YH_YH2f 41.56% with MZ_MZ4f's library and 41.60% with its own.
+  A second library masks 2.1–2.8% of a genome that the first misses, within species and between lineages alike; on
+  DT_004f a second library adds 2.41 points, a third 1.16.
+- Labels (one label per base): about four-fifths of the sequence two libraries both mask gets the same class (81.8%
+  within species, 79.2–80.3% between lineages); LTR differs most between lineages. YH_YH2f's lower LTR total is mostly
+  the same sequence labelled differently; the sequence part comes from `RI_v1`, which masks 0.27–0.38 points of LTR the
+  others leave unmasked.
+- The answer is in section 6 (2026-11-11).
+
+**Merge rehearsals** (`repeats_015`–`repeats_016`): `RI_v5` keeps 99.4% of what its sources mask together (44.15% of
+DT_004f); it has 16 conflicting clusters (132 in `RI_v4`), no classified family relabelled (30 in `RI_v4`), and labels that
+agree with each source on 86.2–86.9% of shared sequence (82.6–85.1% for `RI_v4`). 1,499 of its 5,288 families are Unknown.
+
+**Next:** the accuracy checks on `RI_v5` (question 2): mask DT_005m, MZ_NMK2024a and AC_fAstCal68; the coding-sequence
+check (`gene_overlap.py`, `repeats_017`); Repbase copied to mzebra; the known insertions; `RI_v5`'s 16 conflicting clusters
+inspected by hand. Then the seven assemblies (section 7). Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the
