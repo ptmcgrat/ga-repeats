@@ -520,10 +520,11 @@ class GeneFilter(unittest.TestCase):
         genome = {"s": "ATG" + "GCT" * 40 + "TAA"}
         tx = {"t1": {"sequence": "s", "strand": "+", "gene": "g1", "product": "myosin", "segments": [(0, 126, 0)]},
               "t2": {"sequence": "s", "strand": "+", "gene": "g2", "product": "transposase", "segments": [(0, 126, 0)]},
-              "t3": {"sequence": "s", "strand": "+", "gene": "g3", "product": "tiny", "segments": [(0, 30, 0)]}}
+              "t3": {"sequence": "s", "strand": "+", "gene": "g3", "product": "tiny", "segments": [(0, 30, 0)]},
+              "t4": {"sequence": "s", "strand": "+", "gene": "LOC1", "product": "uncharacterized protein LOC1", "segments": [(0, 126, 0)]}}
         proteins, skipped = gf.host_proteins(tx, genome)
         self.assertEqual(list(proteins), ["g1"])
-        self.assertEqual(skipped, {"transposon product": 1, "internal stop or under 30 aa": 1})
+        self.assertEqual(skipped, {"transposon product": 1, "internal stop or under 30 aa": 1, "uncharacterized or unnamed": 1})
 
     def test_evidence_a_needs_every_genome(self):
         genes = {"G1": [{"te_product": "no", "percent_masked": "80", "top_family": "f1", "product": "NACHT, LRR and PYD domains-containing protein 3"}] * 5,
@@ -537,8 +538,20 @@ class GeneFilter(unittest.TestCase):
     def test_evidence_b_compares_with_transposon_proteins(self):
         host = gf.best_hits(["q1 h1 1e-30 300", "q1 h2 1e-20 200", "q2 h1 1e-30 300", "q3 h3 1e-8 120"])
         te = gf.best_hits(["q2 T1 1e-40 200"])
-        self.assertEqual(host["q1"], ("h1", 1e-30, 300.0))
+        self.assertEqual(host["q1"], ("h1", 1e-30, 300.0, None))
         self.assertEqual(gf.evidence_b(host, te, 1e-10, 2.0), {"q1"})   # q2: 300 < 2 x 200; q3: evalue too weak
+
+    def test_host_match_coverage_on_both_strands(self):
+        hits = gf.best_hits(["q1 h1 1e-30 300 101 400 1000", "q2 h2 1e-20 200 500 201 1000"])
+        self.assertAlmostEqual(hits["q1"][3], 0.30)
+        self.assertAlmostEqual(hits["q2"][3], 0.30)
+
+    def test_files_of_the_first_method_are_found(self):
+        import tempfile
+        work = Path(tempfile.mkdtemp())
+        for name in ("host_proteins.fa", "blastx_host.tsv", "host_db.pdb", "host_named.fa", "filter_report.tsv", "blastx_te.tsv"):
+            (work / name).write_text("")
+        self.assertEqual(sorted(p.name for p in gf.stale_files(work)), ["blastx_host.tsv", "host_db.pdb", "host_proteins.fa"])
 
     def test_decision_rule(self):
         self.assertEqual(gf.decide(True, True, True), ("remove", "A and B"))

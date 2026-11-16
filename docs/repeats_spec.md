@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.13, 2026-11-14 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata)
+**Document version:** 0.14, 2026-11-14 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check)
 **Owner:** McGrath lab
-**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; gene filter written (`RI_v6` next); **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; gene filter corrected after its first report (`RI_v6` next); **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -214,9 +214,13 @@ include families built from multi-copy host genes (NLRs, TRIMs, immune and olfac
 tubulins); `RI_v5` masked 13–14% of the coding sequence of three annotated genomes. Evidence A: on every annotated genome
 checked, a family is the main masker of at least 5 genes of known multi-copy gene families (half or more of their coding
 sequence masked), or masks coding sequence in at least 20 genes. Evidence B: blastx of the family's consensus matches a
-host protein (the longest protein per gene of MZ_NMK2024a, translated from its genome and annotation, transposon
-products left out) at evalue 1e-10 or below, with at least twice the bitscore of its best transposon-protein match
-(RepeatPeps). Families flagged by both are removed; families flagged by one are removed unless a curated Repbase
+host protein at evalue 1e-10 or below, with at least twice the bitscore of its best transposon-protein match
+(RepeatPeps). The host proteins are the longest protein per gene of MZ_NMK2024a, translated from its genome and
+annotation, named genes only: products called "uncharacterized" (mostly gene models built from transposons), products
+naming a transposon protein, and proteins that blastp matches to RepeatPeps (domesticated transposon genes such as
+ZBED or NYNRIN) are left out. How much of the family the host match covers is recorded. (The first report, with
+uncharacterized and transposon-derived host proteins kept, flagged 936 families by evidence B, most of them real
+transposons; nothing was written from it.) Families flagged by both are removed; families flagged by one are removed unless a curated Repbase
 transposon covers at least half of them. The thresholds are reviewed on the first report before any version is written.
 
 **Final library**: built from one assembly per ecogroup, seven libraries in total, merged as above (decision 2026-11-11);
@@ -425,8 +429,11 @@ DT_005m, MZ_NMK2024a and AC_fAstCal68: about 5–6% in "uncharacterized" gene mo
 families), 3.3–3.7% in known multi-copy gene families (false positives), about 4% elsewhere. Masking took about 2.8 h
 per genome with one library, 3.9 h with `RI_v4` and 4.5 h with `RI_v5`.
 
-**Next** (`repeats_018`): `repbase_match.py` on `RI_v5` (Repbase label check, and transposon support for the filter);
-`gene_filter.py` report, review, then `RI_v6`; mask the three annotated genomes with `RI_v6` and rerun the gene check;
+**Repbase label check** (`repeats_018`): 990 of `RI_v5`'s 5,288 families (19%) have a Repbase match covering at least
+80% of them; their classes agree for DNA 99.0%, LINE 98.2%, LTR 81.4%, SINE 50% (14 families). 154 Unknown families have
+such a match and could take its class. 1,539 families have Repbase transposon support (a transposon covering half or more).
+
+**Next** (`repeats_019`): `gene_filter.py` report with the cleaned host proteins, review, then `RI_v6`; mask the three annotated genomes with `RI_v6` and rerun the gene check;
 the known insertions; `RI_v5`'s 16 conflicting clusters inspected. Then the seven assemblies (section 7). Nothing is
 ready to integrate.
 
