@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.12, 2026-11-13 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun)
+**Document version:** 0.13, 2026-11-14 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata)
 **Owner:** McGrath lab
-**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; gene filter written (`RI_v6` next); **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -64,7 +64,9 @@ Projects A, 2a, 2b and 3 consume its output through the coordinator.
 | assemblies: one genome FASTA per panel assembly | panel P1 (25 assemblies, by accession version) | `<data root>/Genomes/<assembly_id>/<accession_version>/genome.fna.gz` (BGZF) | **downloaded 2026-10-26**: all 25 assemblies (with GFF3 for the 8 annotated), in Dropbox and on mzebra |
 | the panel | P1, `config/genome_panel_P1.tsv` | coordinator repository; read with `ga_common.panel` | available |
 | sequence names and lengths of each assembly | as fetched | `provenance.json` in the same folder | with the download |
-| Repbase RepeatMasker Edition (final masking only) | 20181026 (`RepBaseRepeatMaskerEdition-20181026.tar.gz`) | held by the lab on utaka; to be copied to mzebra, outside the repository; where it sits in Dropbox is not a concern (owner) | licence not a concern (owner) |
+| Repbase RepeatMasker Edition (final masking; also the accuracy checks) | 20181026: `RepBaseRepeatMaskerEdition-20181026.tar.gz` (sha256 `213a15f9dafbd1302b1d544b82b9141eacab1c5be5b36233da7446f901375b2e`), holding the sequences only (`RMRBSeqs.embl`, 49,011 entries) | on mzebra in `~/Repbase/20181026`, outside the repository (copied from utaka 2026-11-13); where it sits in Dropbox is not a concern (owner) | licence not a concern (owner) |
+| Repbase metadata (classes and species of those entries) | `RMRBMeta.embl`, release 20181026, 49,011 entries; shipped with RepeatMasker 4.1.0 (copied from the `GenomeSize` environment on mzebra) | `~/Repbase/20181026/RMRBMeta.embl` | CC BY 4.0; `repbase_match.py` joins it to the sequences by entry name and records both files' sha256 |
+| Transposon proteins (gene filter) | Dfam 4.0 RepeatPeps, 18,011 proteins, as RepeatModeler cached it | `~/.RepeatModelerCache/PROT-Dfam_4.0/repeatpeps.lib` (the TETools image carries no libraries) | `gene_filter.py` records its sha256 |
 
 - The registry holds no entries yet (coordinator spec, section 7). Until it does, the
   coordinator's `ga_common.paths` gives the location of each assembly; the project never
@@ -207,6 +209,16 @@ class. Clusters decided by (c) or (d) are flagged and inspected by hand. Requiri
 family contained in a longer one (a nested insertion, or a chimeric consensus) as a family of its own: without it
 (`RI_v4`), 30 classified families were relabelled by much shorter members they contained.
 
+**Gene filter** (decided 2026-11-13; `gene_filter.py`, after `gene_overlap.py` and `repbase_match.py`): de novo libraries
+include families built from multi-copy host genes (NLRs, TRIMs, immune and olfactory receptors, zinc fingers, histones,
+tubulins); `RI_v5` masked 13–14% of the coding sequence of three annotated genomes. Evidence A: on every annotated genome
+checked, a family is the main masker of at least 5 genes of known multi-copy gene families (half or more of their coding
+sequence masked), or masks coding sequence in at least 20 genes. Evidence B: blastx of the family's consensus matches a
+host protein (the longest protein per gene of MZ_NMK2024a, translated from its genome and annotation, transposon
+products left out) at evalue 1e-10 or below, with at least twice the bitscore of its best transposon-protein match
+(RepeatPeps). Families flagged by both are removed; families flagged by one are removed unless a curated Repbase
+transposon covers at least half of them. The thresholds are reviewed on the first report before any version is written.
+
 **Final library**: built from one assembly per ecogroup, seven libraries in total, merged as above (decision 2026-11-11);
 merged with Repbase at the final masking stage only, with the same de-duplication (decision 2026-10-28). Which assemblies,
 and which Repbase taxa, are open (section 7). The final build is scripted.
@@ -343,6 +355,8 @@ has tried.
 | 2026-11-13 | The owner leaves the project's decisions to the student | stated by the student; whether this covers the decisions this document reserves to the owner by name is to be confirmed (section 7) |
 | 2026-11-13 | Merge rehearsal `RI_v5`: as `RI_v4`, plus 80% coverage of the longer sequence (`-aL 0.80`) | in `RI_v4`, short families contained in long ones (nested insertions, chimeric consensus sequences) joined their clusters and relabelled them; student |
 | 2026-11-13 | Merge settings for the final build: those of `RI_v5` (section 4, Merging) | `RI_v5`: conflicting clusters 132 → 16, no classified family relabelled, labels agree with each source on 86–87% of shared sequence, 99.4% of the sources' masking kept (43.91% of DT_004f, against 44.15%); 5,288 families against 3,849; student |
+| 2026-11-13 | Repbase is kept on mzebra in `~/Repbase/20181026`, with the RepeatMasker metadata file (`RMRBMeta.embl`) beside it | the package holds sequences only; the matching release's classes come from RepeatMasker 4.1.0's metadata, already on mzebra; student |
+| 2026-11-13 | Gene filter (section 4), rehearsed on `RI_v5` as `RI_v6`, before the known insertions and the Repbase label check | `RI_v5` masks 13–14% of coding sequence, 3.3–3.7% in known multi-copy gene families; the later checks also test that the filter keeps real transposons; student |
 
 ---
 
@@ -357,6 +371,8 @@ has tried.
 | Does the owner's delegation (2026-11-13) cover the decisions this document reserves to him by name: the build set, the completeness criteria, tool versions and library sources? | before the final library build |
 | `write_manifest.py` for merged versions (`RI_v4`, `RI_v5`, the final library): there is no RepeatModeler run; the manifest records the sources, the merge settings and the merge record | before merged versions are synced |
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
+| Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
+| How much coding sequence may the final library mask? (no published threshold; per gene, about 4% of human genes carry transposon sequence in coding regions) | **yes, before the library is accepted** |
 | The earlier RepeatMasker annotation of LG2, LG10 and LG13 in seven annotated assemblies (an old RepeatMasker, a library from GT3a alone): another de novo library, so not an accuracy reference; worth a consistency comparison? | no |
 | Repbase merge (decided, section 6): which Repbase taxa are retained? The owner and the student decide | before the final masking |
 | **Satellites and other tandem repeats:** does project 1 build and annotate them, or project 2b (centromeres, arrays)? (relayed to the coordinator) | before the library is accepted |
@@ -403,9 +419,16 @@ percentages include RepeatMasker's own simple repeats and low-complexity sequenc
 DT_004f); it has 16 conflicting clusters (132 in `RI_v4`), no classified family relabelled (30 in `RI_v4`), and labels that
 agree with each source on 86.2–86.9% of shared sequence (82.6–85.1% for `RI_v4`). 1,499 of its 5,288 families are Unknown.
 
-**Next:** the accuracy checks on `RI_v5` (question 2): mask DT_005m, MZ_NMK2024a and AC_fAstCal68; the coding-sequence
-check (`gene_overlap.py`, `repeats_017`); Repbase copied to mzebra; the known insertions; `RI_v5`'s 16 conflicting clusters
-inspected by hand. Then the seven assemblies (section 7). Nothing is ready to integrate.
+**Accuracy checks on `RI_v5`** (`repeats_017`): it masks 43.49% of AC_fAstCal68, transposons 41.26% (Quah et al.:
+36.55% of *A. calliptera*; DNA 15.39% against 12.09%, not yet explained). It masks 13.0–14.0% of the coding sequence of
+DT_005m, MZ_NMK2024a and AC_fAstCal68: about 5–6% in "uncharacterized" gene models (mostly by transposon-classified
+families), 3.3–3.7% in known multi-copy gene families (false positives), about 4% elsewhere. Masking took about 2.8 h
+per genome with one library, 3.9 h with `RI_v4` and 4.5 h with `RI_v5`.
+
+**Next** (`repeats_018`): `repbase_match.py` on `RI_v5` (Repbase label check, and transposon support for the filter);
+`gene_filter.py` report, review, then `RI_v6`; mask the three annotated genomes with `RI_v6` and rerun the gene check;
+the known insertions; `RI_v5`'s 16 conflicting clusters inspected. Then the seven assemblies (section 7). Nothing is
+ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the

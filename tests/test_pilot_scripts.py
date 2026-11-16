@@ -28,6 +28,8 @@ import label_agreement as la  # noqa: E402
 import merge_libraries as ml  # noqa: E402
 import evaluate_merge as em  # noqa: E402
 import gene_overlap as go  # noqa: E402
+import repbase_match as rbm  # noqa: E402
+import gene_filter as gf  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -452,6 +454,111 @@ class GeneOverlap(unittest.TestCase):
         for product, expected in (("reverse transcriptase", True), ("Pol polyprotein", True), ("piggyBac transposable element-derived protein 4", True),
                                   ("hatching enzyme", False), ("polymerase delta", False), ("integrin beta-1", False)):
             self.assertEqual(bool(go.TE_PRODUCT.search(product)), expected, product)
+
+
+SEQS_EMBL = """CC   header
+XX
+ID   ACROBAT1     repeatmasker; DNA;  ???;  12 BP.
+CC   consensus
+XX
+SQ   Sequence 12 BP;
+     gggcccggtt tt                                                       12
+//
+ID   ALIEN1_CA     repeatmasker; DNA;  ???;  8 BP.
+SQ   Sequence 8 BP;
+     acgtacgt                                                            8
+//
+""".splitlines(True)
+META_EMBL = """ID   ACROBAT1     repeatmasker; DNA;  ???;  12 BP.
+KW   DNA/PIF.
+CC   RepeatMasker Annotations:
+CC        Type: DNA
+CC        SubType: PIF
+CC        Species: Danio
+CC        SearchStages: 
+//
+ID   ALIEN1_CA     repeatmasker; DNA;  ???;  8 BP.
+CC   RepeatMasker Annotations:
+CC        Type: Satellite
+CC        SubType: 
+CC        Species: 
+//
+""".splitlines(True)
+
+
+class RepbaseLibrary(unittest.TestCase):
+    def test_the_two_halves_are_joined_by_name(self):
+        entries = rbm.build_repbase(SEQS_EMBL, META_EMBL)
+        self.assertEqual(entries, [("ACROBAT1", "DNA", "PIF", "Danio", "GGGCCCGGTTTT"), ("ALIEN1_CA", "Satellite", "", "", "ACGTACGT")])
+        self.assertEqual([rbm.label_of(e[1], e[2]) for e in entries], ["DNA/PIF", "Satellite"])
+
+    def test_a_sequence_without_metadata_stops(self):
+        with self.assertRaises(SystemExit):
+            rbm.build_repbase(SEQS_EMBL, META_EMBL[:8])
+
+    def test_support_needs_a_transposon_class(self):
+        self.assertIn("DNA", rbm.TE_CLASSES)
+        self.assertNotIn("Satellite", rbm.TE_CLASSES)
+
+
+class GeneFilter(unittest.TestCase):
+    GENOME = {"s": "AAATGGCTTTGCCCAAAAGGGTAGTTT"}   # ATG GCT TTG | CCC (intron AAAA) GGG TAG
+
+    def test_plus_strand_two_exons(self):
+        t = {"sequence": "s", "strand": "+", "segments": [(2, 14, 0), (18, 24, 0)]}
+        self.assertEqual(gf.protein_of(t, self.GENOME), "MALPG")
+
+    def test_minus_strand_and_phase(self):
+        fwd = "ATGGCTTAA"                      # M A *
+        genome = {"s": "CC" + gf.revcomp(fwd) + "GG"}
+        t = {"sequence": "s", "strand": "-", "segments": [(2, 11, 0)]}
+        self.assertEqual(gf.protein_of(t, genome), "MA")
+        t2 = {"sequence": "s", "strand": "-", "segments": [(2, 11, 1)]}   # skip one base: TGG CTT AA
+        self.assertEqual(gf.protein_of(t2, genome), "WL")
+
+    def test_transposon_products_and_short_proteins_are_left_out(self):
+        genome = {"s": "ATG" + "GCT" * 40 + "TAA"}
+        tx = {"t1": {"sequence": "s", "strand": "+", "gene": "g1", "product": "myosin", "segments": [(0, 126, 0)]},
+              "t2": {"sequence": "s", "strand": "+", "gene": "g2", "product": "transposase", "segments": [(0, 126, 0)]},
+              "t3": {"sequence": "s", "strand": "+", "gene": "g3", "product": "tiny", "segments": [(0, 30, 0)]}}
+        proteins, skipped = gf.host_proteins(tx, genome)
+        self.assertEqual(list(proteins), ["g1"])
+        self.assertEqual(skipped, {"transposon product": 1, "internal stop or under 30 aa": 1})
+
+    def test_evidence_a_needs_every_genome(self):
+        genes = {"G1": [{"te_product": "no", "percent_masked": "80", "top_family": "f1", "product": "NACHT, LRR and PYD domains-containing protein 3"}] * 5,
+                 "G2": [{"te_product": "no", "percent_masked": "80", "top_family": "f1", "product": "NLR family CARD domain-containing protein 3"}] * 5}
+        fams = {"G1": [{"family": "f2", "other_genes_hit": "25"}], "G2": [{"family": "f2", "other_genes_hit": "19"}]}
+        a = gf.evidence_a(genes, fams, 5, 20)
+        self.assertTrue(a["f1"]["flag"])
+        self.assertFalse(a["f2"]["flag"])          # 19 genes on G2
+        self.assertEqual(a["f2"]["genes_hit"], [25, 19])
+
+    def test_evidence_b_compares_with_transposon_proteins(self):
+        host = gf.best_hits(["q1 h1 1e-30 300", "q1 h2 1e-20 200", "q2 h1 1e-30 300", "q3 h3 1e-8 120"])
+        te = gf.best_hits(["q2 T1 1e-40 200"])
+        self.assertEqual(host["q1"], ("h1", 1e-30, 300.0))
+        self.assertEqual(gf.evidence_b(host, te, 1e-10, 2.0), {"q1"})   # q2: 300 < 2 x 200; q3: evalue too weak
+
+    def test_decision_rule(self):
+        self.assertEqual(gf.decide(True, True, True), ("remove", "A and B"))
+        self.assertEqual(gf.decide(True, False, True), ("keep", "A only; Repbase transposon support"))
+        self.assertEqual(gf.decide(False, True, False), ("remove", "B only; no Repbase support"))
+        self.assertEqual(gf.decide(False, False, False), ("keep", ""))
+
+    def test_a_filtered_version_uses_its_own_library(self):
+        import tempfile
+        root = Path(tempfile.mkdtemp())
+        lib = root / "RI_v6" / "library"
+        lib.mkdir(parents=True)
+        (lib / "RI_v6-families.prefixed.fa").write_text(">A1#LTR/Gypsy\nACGT\n")
+        (lib / "filter_record.json").write_text("{}")
+        saved = c.version_folder
+        c.version_folder = lambda version: root / version
+        try:
+            self.assertEqual(c.library_files("RI_v6")[0], "RI_v6")
+        finally:
+            c.version_folder = saved
 
 
 class OneLabelPerBase(unittest.TestCase):

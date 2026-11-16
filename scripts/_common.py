@@ -103,17 +103,17 @@ def panel_accession(assembly_id: str, panel: str = PANEL_VERSION) -> str:
 def library_files(version: str) -> Tuple[str, Path, Path]:
     """(build assembly id, original families file, prefixed families file) of a version.
 
-    A merged version (merge_libraries.py) has no single build assembly: its library is
-    <version>-families.prefixed.fa, its names already carry their sources, and its
-    library/ holds merge_record.json. For it, the build id is the version and the
-    "original" file is the merged library itself.
+    A merged version (merge_libraries.py) or a filtered one (gene_filter.py) has no single
+    build assembly: its library is <version>-families.prefixed.fa, its names already carry
+    their sources, and its library/ holds merge_record.json or filter_record.json. For it,
+    the build id is the version and the "original" file is that library itself.
     """
     lib = version_folder(version) / "library"
     prefixed = sorted(lib.glob("*-families.prefixed.fa"))
     if len(prefixed) != 1:
         stop(f"expected one *-families.prefixed.fa in {lib}, found {len(prefixed)}")
     build_id = prefixed[0].name[: -len("-families.prefixed.fa")]
-    if build_id == version and (lib / "merge_record.json").exists():
+    if build_id == version and ((lib / "merge_record.json").exists() or (lib / "filter_record.json").exists()):
         return build_id, prefixed[0], prefixed[0]
     original = lib / f"{build_id}-families.fa"
     if not original.exists():
