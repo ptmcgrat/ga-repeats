@@ -392,6 +392,29 @@ class MergeCommand(unittest.TestCase):
         self.assertNotIn("-aL", self._command())
 
 
+class CopyNumberFilter(unittest.TestCase):
+    """Consensus fam1 is 1,000 bp. RepeatMasker .out lines: + strand 'begin end (left)', C strand '(left) end begin'."""
+    OUT = [
+        "   SW   perc perc perc  query      position in query           matching  repeat     position in repeat",
+        "  900  5.0  0.0  0.0  s1  1001  1900  (100)  +  fam1  LTR/Gypsy  1  900  (100)  1",        # 90% of it: full length
+        "  500 10.0  0.0  0.0  s1  5001  5500  (100)  C  fam1  LTR/Gypsy  (0)  1000  501  2",      # fragments of one copy ...
+        "  400 10.0  0.0  0.0  s1  5601  5950  (100)  C  fam1  LTR/Gypsy  (500)  500  151  2",     # ... 501-1000 + 151-500 = 85%
+        "  300 25.0  0.0  0.0  s1  9001  9900  (100)  +  fam1  LTR/Gypsy  1  900  (100)  3",        # 75% identity: not full length
+        "  100  2.0  0.0  0.0  s1  12001 12500 (100)  +  fam1  LTR/Gypsy  1  500  (500)  4",        # covers 50%: not full length
+        "  100  2.0  0.0  0.0  s1  13001 13060 (100)  +  fam2  DNA        1  60   (0)    5",        # fam2 is 60 bp: under 80 bp
+    ]
+
+    def test_parsing_both_strands(self):
+        hits = list(ml.consensus_hits(self.OUT))
+        self.assertEqual(hits[0], ("fam1", "1", 900, 5.0, 1, 900))
+        self.assertEqual(hits[1], ("fam1", "2", 500, 10.0, 501, 1000))
+
+    def test_full_length_copies_join_fragments_and_apply_80_80_80(self):
+        counts = ml.full_length_copies(ml.consensus_hits(self.OUT), {"fam1": 1000, "fam2": 60})
+        self.assertEqual(counts["fam1"], 2)   # copies 1 and 2
+        self.assertEqual(counts["fam2"], 0)
+
+
 class MergedVersionLookup(unittest.TestCase):
     def test_a_merged_version_uses_its_own_library(self):
         import tempfile
@@ -552,7 +575,7 @@ class GeneFilter(unittest.TestCase):
         import tempfile
         d = Path(tempfile.mkdtemp())
         (d / "old.tsv").write_text("family\tevidence_A\tevidence_B\n")
-        (d / "new.tsv").write_text("family\tevidence_A\tevidence_B\tevidence_B_strength\n")
+        (d / "new.tsv").write_text("family\tevidence_A\tevidence_B\tevidence_B_strength\ttag_category\n")
         self.assertTrue(gf.report_is_stale(d / "old.tsv"))
         self.assertFalse(gf.report_is_stale(d / "new.tsv"))
         self.assertFalse(gf.report_is_stale(d / "absent.tsv"))
@@ -576,12 +599,28 @@ class GeneFilter(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in gf.stale_files(work)), ["blastx_host.tsv", "host_db.pdb", "host_proteins.fa"])
 
     def test_decision_rule(self):
-        self.assertEqual(gf.decide(True, "strong", True), ("remove", "A and B"))
+        self.assertEqual(gf.decide(True, "strong", True), ("tag", "A and B"))
         self.assertEqual(gf.decide(True, "", True), ("keep", "A only; Repbase transposon support"))
-        self.assertEqual(gf.decide(True, "weak", False), ("remove", "A only; no Repbase support"))
-        self.assertEqual(gf.decide(False, "strong", False), ("remove", "B only; no Repbase support"))
-        self.assertEqual(gf.decide(False, "weak", False), ("keep", "weak B only (small host match, not a gene family)"))
+        self.assertEqual(gf.decide(True, "weak", False), ("tag", "A only; no Repbase support"))
+        self.assertEqual(gf.decide(False, "strong", False), ("tag", "B only; no Repbase support"))
+        self.assertEqual(gf.decide(False, "weak", False), ("keep", "weak B only (small host match, not a gene family): not tagged"))
         self.assertEqual(gf.decide(False, "", False), ("keep", ""))
+
+    def test_tag_categories(self):
+        cases = {"protein NLRC3": "NLR", "tripartite motif-containing protein 16": "TRIM", "olfactory receptor 10Z1": "OR",
+                 "trace amine-associated receptor 13c": "TAAR", "protocadherin alpha-2": "PCDH", "zinc finger protein 668": "ZNF",
+                 "histone H1.0": "HIST", "histone-lysine N-methyltransferase SETD2": "OTHER", "tubulin alpha-1A chain": "TUB",
+                 "tubulin-specific chaperone A": "OTHER", "homeodomain-interacting protein kinase 1": "OTHER"}
+        for product, expected in cases.items():
+            self.assertEqual(gf.category_of(product), expected, product)
+        self.assertFalse(gf.HOST_FAMILIES.search("histone-lysine N-methyltransferase SETD2"))
+
+    def test_tag_category_prefers_a_known_family(self):
+        self.assertEqual(gf.tag_category("protein NLRC3", "strong", {"flag": True, "category": "TRIM"}), "NLR")
+        self.assertEqual(gf.tag_category("myosin-7", "strong", {"flag": True, "category": "TRIM"}), "TRIM")
+        self.assertEqual(gf.tag_category("myosin-7", "strong", {"flag": False}), "OTHER")
+        self.assertEqual(gf.tag_category("", "", {"flag": True, "category": "MULTI"}), "MULTI")
+        self.assertEqual(gf.tagged_name("MZ_MZ4f_rnd-1_family-163", "NLR", "LTR/Gypsy"), "MZ_MZ4f_rnd-1_family-163_hostgene-NLR#LTR/Gypsy")
 
     def test_a_filtered_version_uses_its_own_library(self):
         import tempfile

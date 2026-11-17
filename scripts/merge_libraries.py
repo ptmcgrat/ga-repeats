@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Merge several versions' libraries into one new version (spec section 4: de-duplication).
 
-1. pool the sources' prefixed libraries (each family name already carries its build assembly);
+0. optionally (--min-full-length-copies, after panEDTA; decided 2026-11-17) keep only families with at least
+   that many full-length copies in their own build genome. A copy is full-length by the 80-80-80 rule: its
+   alignments cover at least 80% of the consensus, at at least 80% identity, over at least 80 bp; RepeatMasker's
+   fragments of one copy are joined by its element ID. The copies are counted in each source's masking of its
+   own build genome (<version folder>/masked/<build>/<build>.out). Every family's count is listed in
+   copy_number_table.tsv;
+1. pool the (kept) prefixed families of the sources (each family name already carries its build assembly);
 2. cluster with cd-hit-est as compare_libraries.py does: local identity (-G 0), an identity
    threshold (-c) and a minimum alignment coverage of the shorter sequence (-aS); optionally also
    of the longer sequence (-aL, --coverage-longer), so that a short family contained in a long one
@@ -15,6 +21,8 @@
                                       the alignment covers, its own label, the cluster's label and the
                                       rule that decided it
      merge_record.json                sources and their library sha256, thresholds, commands, counts
+     copy_number_table.tsv            with --min-full-length-copies: every source family, its full-length
+                                      copies in its build genome, and whether it was kept
 
 Label rule (provisional, for the merge rehearsal; recorded in merge_record.json):
   a. no classified member: Unknown;
@@ -32,6 +40,8 @@ Example:
   python scripts/merge_libraries.py --version RI_v4 --sources RI_v1 RI_v2 RI_v3            # dry run
   python scripts/merge_libraries.py --version RI_v4 --sources RI_v1 RI_v2 RI_v3 --go
   python scripts/merge_libraries.py --version RI_v5 --sources RI_v1 RI_v2 RI_v3 --coverage-longer 0.80 --go
+  python scripts/merge_libraries.py --version RI_v7 --sources RI_v1 RI_v2 RI_v3 --coverage-longer 0.80 \
+      --min-full-length-copies 3 --go
 """
 from __future__ import annotations
 
@@ -41,7 +51,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Tuple
 
 sys.dont_write_bytecode = True  # keep __pycache__ out of the repository
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -69,6 +79,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--identity", type=float, default=0.80, help="cd-hit-est identity threshold (default 0.80)")
     parser.add_argument("--coverage", type=float, default=0.80,
                         help="minimum alignment coverage of the shorter sequence, cd-hit-est -aS (default 0.80)")
+    parser.add_argument("--min-full-length-copies", type=int, default=None,
+                        help="keep only families with at least this many full-length (80-80-80) copies in their own "
+                             "build genome (panEDTA uses 3; default: not used)")
     parser.add_argument("--coverage-longer", type=float, default=None,
                         help="minimum alignment coverage of the longer sequence, cd-hit-est -aL (default: not used)")
     c.add_common_args(parser)
@@ -102,6 +115,38 @@ def cluster_label(members: Sequence[Member], representative: Member) -> Tuple[st
     top = max(counts.values())
     candidates = [m for m in of_class if counts[m.label] == top]
     return max(candidates, key=lambda m: (m.length, m.name)).label, rule
+
+
+FL_COVERAGE, FL_IDENTITY, FL_LENGTH = 0.80, 80.0, 80   # the 80-80-80 rule
+
+
+def consensus_hits(lines: Iterable[str]) -> Iterable[Tuple[str, str, int, float, int, int]]:
+    """(repeat, element id, aligned length on the genome, divergence, consensus start, consensus end) per .out line."""
+    for line in lines:
+        f = line.split()
+        if len(f) < 15 or not f[0].isdigit():
+            continue
+        start, end = (int(f[11]), int(f[12])) if f[8] == "+" else (int(f[13]), int(f[12]))
+        yield f[9], f[14], int(f[6]) - int(f[5]) + 1, float(f[1]), min(start, end), max(start, end)
+
+
+def full_length_copies(hits: Iterable[Tuple[str, str, int, float, int, int]], lengths: Dict[str, int]) -> Counter:
+    """repeat -> number of its copies (fragments joined by element id) meeting the 80-80-80 rule."""
+    elements: Dict[Tuple[str, str], list] = defaultdict(list)
+    for repeat, element, aligned, divergence, start, end in hits:
+        if repeat in lengths:
+            elements[(repeat, element)].append((aligned, divergence, start, end))
+    counts: Counter = Counter()
+    for (repeat, _element), parts in elements.items():
+        aligned = sum(p[0] for p in parts)
+        if aligned < FL_LENGTH:
+            continue
+        if 100 - sum(p[0] * p[1] for p in parts) / aligned < FL_IDENTITY:
+            continue
+        covered = c.merged_length(c.merge_by_sequence((repeat, p[2] - 1, p[3]) for p in parts))
+        if covered >= FL_COVERAGE * lengths[repeat]:
+            counts[repeat] += 1
+    return counts
 
 
 def coverage_of(member: Member, alignment: Optional[Tuple[int, int, int, int, str]]) -> Optional[float]:
@@ -165,6 +210,8 @@ def main(argv=None) -> None:
     if args.version in args.sources:
         c.stop("the merged version must be a new version")
     c.word_size(args.identity)  # raises for thresholds cd-hit-est cannot use
+    if args.min_full_length_copies is not None and args.min_full_length_copies < 1:
+        c.stop("--min-full-length-copies is a count of copies, at least 1")
     if args.coverage_longer is not None and not 0 < args.coverage_longer <= 1:
         c.stop("--coverage-longer is a fraction between 0 and 1, e.g. 0.80")
 
@@ -177,9 +224,12 @@ def main(argv=None) -> None:
             if f.name in members:
                 c.stop(f"family name {f.name} occurs twice; were all libraries prefixed?")
             members[f.name] = Member(f.name, f.family, f.label, f.top_class, f.length, version)
+        own_out = c.version_folder(version) / "masked" / build_id / f"{build_id}.out"
         sources.append({"version": version, "build_assembly": build_id, "library": str(prefixed),
-                        "library_sha256": None, "families": len(fams)})
+                        "library_sha256": None, "families": len(fams), "own_genome_out": str(own_out)})
         print(f"{version} ({build_id}): {len(fams)} families, {prefixed}")
+        if args.min_full_length_copies is not None and not own_out.exists():
+            c.stop(f"{version} has not masked its own build genome: {own_out} not found (needed to count copies)")
 
     target = c.version_folder(args.version)
     work = args.scratch / args.version / "merge"
@@ -187,6 +237,8 @@ def main(argv=None) -> None:
     print(f"work folder: {work}")
     longer = "" if args.coverage_longer is None else f", of the longer sequence {args.coverage_longer:.2f}"
     print(f"cd-hit-est: identity {args.identity:.2f}, coverage of the shorter sequence {args.coverage:.2f}{longer}, local alignment")
+    if args.min_full_length_copies is not None:
+        print(f"copy-number filter: at least {args.min_full_length_copies} full-length (80-80-80) copies in the family's own build genome")
     if target.exists():
         c.stop(f"{target} already exists; a version is never changed")
     if work.exists():
@@ -199,11 +251,41 @@ def main(argv=None) -> None:
     work.mkdir(parents=True)
     for s in sources:
         s["library_sha256"] = c.sha256(Path(s["library"]))
+    copy_rows, copy_summary = [], None
+    if args.min_full_length_copies is not None:
+        dropped: Counter = Counter()
+        for s in sources:
+            print(f"counting full-length copies of {s['version']}'s families in {s['build_assembly']} ...", flush=True)
+            own = {m.family: m for m in members.values() if m.source == s["version"]}
+            with open(s["own_genome_out"]) as handle:
+                counts = full_length_copies(consensus_hits(handle), {f: m.length for f, m in own.items()})
+            s["own_genome_out_sha256"] = c.sha256(Path(s["own_genome_out"]))
+            kept_here = 0
+            for fam, m in sorted(own.items()):
+                keep = counts[fam] >= args.min_full_length_copies
+                copy_rows.append([s["version"], m.name, m.label, m.length, counts[fam], "yes" if keep else "no"])
+                if keep:
+                    kept_here += 1
+                else:
+                    dropped[m.top_class] += 1
+                    del members[m.name]
+            s["kept_by_copy_number"] = kept_here
+            print(f"  {s['version']}: {kept_here} of {len(own)} families have {args.min_full_length_copies}+ full-length copies")
+        copy_summary = {"min_full_length_copies": args.min_full_length_copies,
+                        "rule": "80-80-80: copies covering >= 80% of the consensus at >= 80% identity over >= 80 bp; "
+                                "RepeatMasker fragments joined by element id; counted in the source's masking of its own build genome",
+                        "kept": len(members), "dropped": sum(dropped.values()), "dropped_by_class": dict(dropped.most_common())}
+        c.write_tsv(work / "copy_number_table.tsv", ["source", "family", "label", "length", "full_length_copies", "kept"], copy_rows)
+        print(f"copy-number filter: {len(members)} families kept, {sum(dropped.values())} dropped ("
+              + ", ".join(f"{k} {v}" for k, v in dropped.most_common()) + ")")
+    sequences = {}
+    for s in sources:
+        sequences.update(read_fasta(Path(s["library"])))
     pooled = work / "pooled.fa"
     with open(pooled, "x") as handle:
-        for s in sources:
-            text = Path(s["library"]).read_text()
-            handle.write(text if text.endswith("\n") else text + "\n")
+        for name in members:
+            seq = sequences[name]
+            handle.write(f">{name}\n" + "".join(seq[i:i + 60] + "\n" for i in range(0, len(seq), 60)))
     prefix = work / f"cdhit_c{args.identity:.2f}"
     command = c.container(args.sif, c.CDHIT_EST, "-i", str(pooled), "-o", str(prefix) + ".fa",
                           "-c", f"{args.identity:.2f}", "-G", "0", "-aS", f"{args.coverage:.2f}",
@@ -241,6 +323,7 @@ def main(argv=None) -> None:
                        "coverage_of_longer": args.coverage_longer, "alignment": "local (-G 0)",
                        "version_line": cdhit_version, "command": c.shell_text(command)},
         "label_rule": RULE_TEXT,
+        "copy_number_filter": copy_summary,
         "counts": {"families_in": len(members), "clusters": len(clusters), "by_rule": dict(sorted(rules.items())),
                    "conflicts": rules["c"] + rules["d"],
                    "label_changed_on_representative": sum(1 for h, r in headers if h.split("#", 1)[1] != members[r].label)},
@@ -253,7 +336,7 @@ def main(argv=None) -> None:
         handle.write("\n")
 
     library = target / "library"
-    for name in (merged.name, "cluster_table.tsv", "merge_record.json"):
+    for name in (merged.name, "cluster_table.tsv", "merge_record.json") + (("copy_number_table.tsv",) if copy_rows else ()):
         c.copy_new(work / name, library / name)
     counts = record["counts"]
     print(f"\n{len(members)} families -> {len(clusters)} clusters; rules: "

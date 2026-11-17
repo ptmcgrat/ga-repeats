@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.15, 2026-11-14 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report)
+**Document version:** 0.16, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal)
 **Owner:** McGrath lab
-**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); accuracy checks (question 2) begun on `RI_v5`; gene filter corrected after its first report (`RI_v6` next); **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); gene-derived families to be tagged; the `RI_v7` rehearsal (copy-number filter, then tagging) next; **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -209,6 +209,12 @@ class. Clusters decided by (c) or (d) are flagged and inspected by hand. Requiri
 family contained in a longer one (a nested insertion, or a chimeric consensus) as a family of its own: without it
 (`RI_v4`), 30 classified families were relabelled by much shorter members they contained.
 
+**Copy-number filter** (decided 2026-11-17, after panEDTA, Ou et al. 2024; `merge_libraries.py
+--min-full-length-copies 3`): before pooling, a family is kept only if it has at least three full-length copies in its
+own build genome. A copy is full-length by the 80-80-80 rule: its alignments cover at least 80% of the consensus, at
+at least 80% identity, over at least 80 bp; RepeatMasker's fragments of one copy are joined by its element ID. Copies
+are counted in each source's masking of its own build genome; every family's count is kept (`copy_number_table.tsv`).
+
 **Gene filter** (decided 2026-11-13; `gene_filter.py`, after `gene_overlap.py` and `repbase_match.py`): de novo libraries
 include families built from multi-copy host genes (NLRs, TRIMs, immune and olfactory receptors, zinc fingers, histones,
 tubulins); `RI_v5` masked 13–14% of the coding sequence of three annotated genomes. Evidence A: on every annotated genome
@@ -226,8 +232,7 @@ of the family, or the host gene belongs to a known multi-copy gene family (NLRs,
 trace amine receptors, protocadherins, zinc fingers, histones, tubulins). A family with only weak evidence B (a small
 host-like stretch in what is otherwise a transposon) is kept and listed; cutting the stretch out of its consensus is a
 possible later step. Before any version is written, the report estimates what the removals cost: the masked coding
-sequence and the genome masking the removed families account for. Families flagged by both are removed; families flagged by one are removed unless a curated Repbase
-transposon covers at least half of them. The thresholds are reviewed on the first report before any version is written.
+sequence and the genome masking the removed families account for. Families flagged by both are tagged; families flagged by one are tagged unless a curated Repbase transposon covers at least half of them (decided 2026-11-17: tagged, not removed). A tagged family keeps its sequence and class and is renamed `<family>_hostgene-<CATEGORY>#<class>`, for example `MZ_MZ4f_rnd-1_family-163_hostgene-NLR#LTR/Gypsy`; CATEGORY is NLR, TRIM, IMMUNE, OR, TAAR, TASTE, PCDH, ZNF, HIST, TUB, OTHER (another named host gene) or MULTI (no protein match, but coding sequence in many named genes), from the best host protein, else from the gene family it mainly masks. Masking and class shares are unchanged by tagging, so they stay comparable with Quah et al., who kept such families in their library; any analysis can include or exclude tagged families. The thresholds are reviewed on the first report before any version is written.
 
 **Final library**: built from one assembly per ecogroup, seven libraries in total, merged as above (decision 2026-11-11);
 merged with Repbase at the final masking stage only, with the same de-duplication (decision 2026-10-28). Which assemblies,
@@ -368,6 +373,10 @@ has tried.
 | 2026-11-13 | Repbase is kept on mzebra in `~/Repbase/20181026`, with the RepeatMasker metadata file (`RMRBMeta.embl`) beside it | the package holds sequences only; the matching release's classes come from RepeatMasker 4.1.0's metadata, already on mzebra; student |
 | 2026-11-13 | Gene filter (section 4), rehearsed on `RI_v5` as `RI_v6`, before the known insertions and the Repbase label check | `RI_v5` masks 13–14% of coding sequence, 3.3–3.7% in known multi-copy gene families; the later checks also test that the filter keeps real transposons; student |
 | 2026-11-14 | Gene filter refined (section 4): evidence A counts named genes only; evidence B counts only when strong (host match covering 30% of the family, or a known multi-copy gene family); weak evidence B alone is kept and listed; the report estimates the cost | the second report: the host match covered a median 11% of the families removed on protein evidence alone (105 of them LTR elements), and 98 of evidence A's 132 families came only through a gene count that included uncharacterized models; student |
+| 2026-11-17 | Gene-derived families are tagged, not removed: `<family>_hostgene-<CATEGORY>#<class>`, categories in section 4 | Quah et al. kept them in their library (they filtered their gene set instead); tagging keeps masking and class shares comparable while letting analyses exclude them; the class after `#` stays a transposon class because RepeatMasker reads it as the classification; student |
+| 2026-11-17 | panEDTA's copy-number filter before merging (section 4): at least 3 full-length (80-80-80) copies in the family's own build genome | removes low-copy and incomplete families that would accumulate across seven libraries, and keeps the library and masking time down (Ou et al. 2024); student |
+| 2026-11-17 | panEDTA's annotation-inconsistency measure for the labels (question 2) | a reference-free check of label consistency (Ou et al. 2024); to be built after reading EDTA's own script; student |
+| 2026-11-17 | Rehearsal `RI_v7`: `RI_v1`–`RI_v3` merged with the copy-number filter and the merge settings, then the gene check, the Repbase match and tagging | test the copy-number filter and the tagging before the final build; student |
 
 ---
 
@@ -383,6 +392,8 @@ has tried.
 | `write_manifest.py` for merged versions (`RI_v4`, `RI_v5`, the final library): there is no RepeatModeler run; the manifest records the sources, the merge settings and the merge record | before merged versions are synced |
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
 | Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
+| The host-gene tag in the shared `repeats` contract, and whether masked genomes used by other projects should include tagged families (through the coordinator) | before first integration |
+| Gene filter rule for tagging: keep the gene-family exception for evidence B, or count it by coverage only? (`RI_v7`'s report shows both) | no |
 | How much coding sequence may the final library mask? (no published threshold; per gene, about 4% of human genes carry transposon sequence in coding regions) | **yes, before the library is accepted** |
 | The earlier RepeatMasker annotation of LG2, LG10 and LG13 in seven annotated assemblies (an old RepeatMasker, a library from GT3a alone): another de novo library, so not an accuracy reference; worth a consistency comparison? | no |
 | Repbase merge (decided, section 6): which Repbase taxa are retained? The owner and the student decide | before the final masking |
@@ -444,10 +455,10 @@ such a match and could take its class. 1,539 families have Repbase transposon su
 cleaned); the second, with cleaned host proteins, flagged 487 by evidence B and 132 by evidence A, 98 by both, and would
 have removed 491 families. The 98 flagged by both match NLRC3, NLRs, TRIMs, butyrophilin, Fc and olfactory receptors.
 
-**Next** (`repeats_020`): `gene_overlap.py` again on the three annotated genomes (named-gene counts); `gene_filter.py`
-report with the refined evidence, review, then `RI_v6`; mask the three annotated genomes with `RI_v6` and rerun the gene check;
-the known insertions; `RI_v5`'s 16 conflicting clusters inspected. Then the seven assemblies (section 7). Nothing is
-ready to integrate.
+**Next** (`repeats_021`): `RI_v7`: merge `RI_v1`–`RI_v3` with the copy-number filter; mask DT_004f, DT_005m,
+MZ_NMK2024a and AC_fAstCal68; `evaluate_merge.py`, `gene_overlap.py` and `repbase_match.py` on it; the tagging report
+(choose the rule), then the tagged version. Then the inconsistency measure, the known insertions, and the seven
+assemblies (section 7). Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the
