@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.16, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal)
+**Document version:** 0.17, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test)
 **Owner:** McGrath lab
-**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); gene-derived families to be tagged; the `RI_v7` rehearsal (copy-number filter, then tagging) next; **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); gene-derived families to be tagged; the concatenation test (`RI_v8`) running; **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -213,7 +213,9 @@ family contained in a longer one (a nested insertion, or a chimeric consensus) a
 --min-full-length-copies 3`): before pooling, a family is kept only if it has at least three full-length copies in its
 own build genome. A copy is full-length by the 80-80-80 rule: its alignments cover at least 80% of the consensus, at
 at least 80% identity, over at least 80 bp; RepeatMasker's fragments of one copy are joined by its element ID. Copies
-are counted in each source's masking of its own build genome; every family's count is kept (`copy_number_table.tsv`).
+are counted in each source's masking of its own build genome; every family's count is kept (`copy_number_table.tsv`). **Set aside for now (2026-11-17):** in the `RI_v7` rehearsal it dropped 1,290 of 7,100 families (18%), among them large LINE, LTR and DNA families that rarely occur full-length (40% of families of 8 kb or more were dropped); the dropped families accounted for 4.3-5.2% of DT_004f in their own libraries' masking (an upper bound). The option stays in `merge_libraries.py`, unused.
+
+**Concatenation test** (2026-11-17; `merge_libraries.py --no-clustering`, `compare_concatenation.py`): the alternative to merging is to concatenate the libraries and let RepeatMasker's scores choose among near-duplicate families at each copy. `RI_v8` concatenates `RI_v1`-`RI_v3` (7,100 families, no clustering) and masks DT_004f; it is compared with `RI_v5` (the same sources merged) on coverage, class shares, label agreement, fragmentation (annotations and elements per Mb), how each `RI_v5` cluster's copies are split among its members, and run time. Concatenation is adopted if coverage rises clearly and consistency does not suffer; a middle ground is to collapse only near-identical families (95% identity or more).
 
 **Gene filter** (decided 2026-11-13; `gene_filter.py`, after `gene_overlap.py` and `repbase_match.py`): de novo libraries
 include families built from multi-copy host genes (NLRs, TRIMs, immune and olfactory receptors, zinc fingers, histones,
@@ -377,6 +379,8 @@ has tried.
 | 2026-11-17 | panEDTA's copy-number filter before merging (section 4): at least 3 full-length (80-80-80) copies in the family's own build genome | removes low-copy and incomplete families that would accumulate across seven libraries, and keeps the library and masking time down (Ou et al. 2024); student |
 | 2026-11-17 | panEDTA's annotation-inconsistency measure for the labels (question 2) | a reference-free check of label consistency (Ou et al. 2024); to be built after reading EDTA's own script; student |
 | 2026-11-17 | Rehearsal `RI_v7`: `RI_v1`–`RI_v3` merged with the copy-number filter and the merge settings, then the gene check, the Repbase match and tagging | test the copy-number filter and the tagging before the final build; student |
+| 2026-11-17 | The copy-number filter is set aside for now | in `RI_v7` it dropped 18% of families, among them large LINE, LTR and DNA families with few full-length copies; the dropped families accounted for 4.3-5.2% of DT_004f in their own libraries' masking; student |
+| 2026-11-17 | Concatenation test `RI_v8`: `RI_v1`-`RI_v3` concatenated without clustering, DT_004f masked, compared with `RI_v5` | concatenation loses no family, but near-duplicates may split one family's copies, add label noise and fragment annotations, and masking takes longer; test before choosing; student |
 
 ---
 
@@ -392,6 +396,7 @@ has tried.
 | `write_manifest.py` for merged versions (`RI_v4`, `RI_v5`, the final library): there is no RepeatModeler run; the manifest records the sources, the merge settings and the merge record | before merged versions are synced |
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
 | Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
+| Merge or concatenate the seven libraries? (the `RI_v8` test) | before the final build |
 | The host-gene tag in the shared `repeats` contract, and whether masked genomes used by other projects should include tagged families (through the coordinator) | before first integration |
 | Gene filter rule for tagging: keep the gene-family exception for evidence B, or count it by coverage only? (`RI_v7`'s report shows both) | no |
 | How much coding sequence may the final library mask? (no published threshold; per gene, about 4% of human genes carry transposon sequence in coding regions) | **yes, before the library is accepted** |
@@ -455,10 +460,14 @@ such a match and could take its class. 1,539 families have Repbase transposon su
 cleaned); the second, with cleaned host proteins, flagged 487 by evidence B and 132 by evidence A, 98 by both, and would
 have removed 491 families. The 98 flagged by both match NLRC3, NLRs, TRIMs, butyrophilin, Fc and olfactory receptors.
 
-**Next** (`repeats_021`): `RI_v7`: merge `RI_v1`–`RI_v3` with the copy-number filter; mask DT_004f, DT_005m,
-MZ_NMK2024a and AC_fAstCal68; `evaluate_merge.py`, `gene_overlap.py` and `repbase_match.py` on it; the tagging report
-(choose the rule), then the tagged version. Then the inconsistency measure, the known insertions, and the seven
-assemblies (section 7). Nothing is ready to integrate.
+**`RI_v7`** (copy-number filter): merged, not masked; the filter is set aside (section 4).
+
+**Next** (`repeats_022`): the concatenation test: `RI_v8` (`merge_libraries.py --no-clustering`), DT_004f masked with it,
+`evaluate_merge.py` and `compare_concatenation.py` against `RI_v5`; decide merge or concatenate. Meanwhile: the tagging
+report on `RI_v5` (`gene_filter.py --new-version RI_v6`), then the tag rule and `RI_v6`; the seven build assemblies (a
+proposal: MZ_MZ4f, YH_YH2f, AC_SAMEA123396441, CV_CV2f, DT_SAMEA123396444, MC_MC3m, RC_005m; not decided), with
+Patrick's confirmation before the five new RepeatModeler runs; the inconsistency measure; the known insertions.
+Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the

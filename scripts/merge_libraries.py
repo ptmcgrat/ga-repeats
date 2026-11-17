@@ -8,6 +8,8 @@
    own build genome (<version folder>/masked/<build>/<build>.out). Every family's count is listed in
    copy_number_table.tsv;
 1. pool the (kept) prefixed families of the sources (each family name already carries its build assembly);
+   with --no-clustering (the concatenation test, 2026-11-17) the pooled families are the version's library,
+   every family keeping its own name and label, and steps 2-4 are skipped (no cluster table);
 2. cluster with cd-hit-est as compare_libraries.py does: local identity (-G 0), an identity
    threshold (-c) and a minimum alignment coverage of the shorter sequence (-aS); optionally also
    of the longer sequence (-aL, --coverage-longer), so that a short family contained in a long one
@@ -42,6 +44,7 @@ Example:
   python scripts/merge_libraries.py --version RI_v5 --sources RI_v1 RI_v2 RI_v3 --coverage-longer 0.80 --go
   python scripts/merge_libraries.py --version RI_v7 --sources RI_v1 RI_v2 RI_v3 --coverage-longer 0.80 \
       --min-full-length-copies 3 --go
+  python scripts/merge_libraries.py --version RI_v8 --sources RI_v1 RI_v2 RI_v3 --no-clustering --go
 """
 from __future__ import annotations
 
@@ -79,6 +82,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--identity", type=float, default=0.80, help="cd-hit-est identity threshold (default 0.80)")
     parser.add_argument("--coverage", type=float, default=0.80,
                         help="minimum alignment coverage of the shorter sequence, cd-hit-est -aS (default 0.80)")
+    parser.add_argument("--no-clustering", action="store_true",
+                        help="concatenate the sources' families without clustering (the concatenation test)")
     parser.add_argument("--min-full-length-copies", type=int, default=None,
                         help="keep only families with at least this many full-length (80-80-80) copies in their own "
                              "build genome (panEDTA uses 3; default: not used)")
@@ -203,6 +208,29 @@ def read_fasta(path: Path) -> Dict[str, str]:
     return {k: "".join(v) for k, v in seqs.items()}
 
 
+def concatenate(args, target: Path, work: Path, pooled: Path, sources: list, members: dict, started) -> None:
+    """The version's library is the pooled families as they are; RepeatMasker's scores choose among them."""
+    merged = work / f"{args.version}-families.prefixed.fa"
+    c.copy_new(pooled, merged)
+    by_class = Counter(m.top_class for m in members.values())
+    record = {
+        "version": args.version, "kind": "concatenated library", "sources": sources, "cd_hit_est": None,
+        "label_rule": "none: every source family keeps its own name and label; RepeatMasker's scores choose among them",
+        "counts": {"families_in": len(members), "families_out": len(members), "by_class": dict(by_class.most_common())},
+        "started": f"{started:%Y-%m-%d %H:%M:%S}", "finished": f"{datetime.now():%Y-%m-%d %H:%M:%S}",
+        "ga_repeats_version": (Path(__file__).resolve().parent.parent / "VERSION").read_text().strip(),
+    }
+    with open(work / "merge_record.json", "x") as handle:
+        json.dump(record, handle, indent=2)
+        handle.write("\n")
+    library = target / "library"
+    for name in (merged.name, "merge_record.json"):
+        c.copy_new(work / name, library / name)
+    print(f"\n{len(members)} families concatenated, none clustered ({', '.join(f'{k} {v}' for k, v in by_class.most_common())})")
+    print(f"written: {library}/ ({merged.name}, merge_record.json)")
+    print(f"next: python scripts/mask_genomes.py --version {args.version} --assemblies DT_004f")
+
+
 def main(argv=None) -> None:
     args = parse_args(argv)
     if len(set(args.sources)) < 2 or len(set(args.sources)) != len(args.sources):
@@ -210,6 +238,8 @@ def main(argv=None) -> None:
     if args.version in args.sources:
         c.stop("the merged version must be a new version")
     c.word_size(args.identity)  # raises for thresholds cd-hit-est cannot use
+    if args.no_clustering and (args.coverage_longer is not None or args.min_full_length_copies is not None):
+        c.stop("--no-clustering keeps every family; it takes no clustering or copy-number options")
     if args.min_full_length_copies is not None and args.min_full_length_copies < 1:
         c.stop("--min-full-length-copies is a count of copies, at least 1")
     if args.coverage_longer is not None and not 0 < args.coverage_longer <= 1:
@@ -236,7 +266,10 @@ def main(argv=None) -> None:
     print(f"new version {args.version}: {target}")
     print(f"work folder: {work}")
     longer = "" if args.coverage_longer is None else f", of the longer sequence {args.coverage_longer:.2f}"
-    print(f"cd-hit-est: identity {args.identity:.2f}, coverage of the shorter sequence {args.coverage:.2f}{longer}, local alignment")
+    if args.no_clustering:
+        print("no clustering: the version's library is every family of the sources, with its own name and label")
+    else:
+        print(f"cd-hit-est: identity {args.identity:.2f}, coverage of the shorter sequence {args.coverage:.2f}{longer}, local alignment")
     if args.min_full_length_copies is not None:
         print(f"copy-number filter: at least {args.min_full_length_copies} full-length (80-80-80) copies in the family's own build genome")
     if target.exists():
@@ -286,6 +319,9 @@ def main(argv=None) -> None:
         for name in members:
             seq = sequences[name]
             handle.write(f">{name}\n" + "".join(seq[i:i + 60] + "\n" for i in range(0, len(seq), 60)))
+    if args.no_clustering:
+        concatenate(args, target, work, pooled, sources, members, started)
+        return
     prefix = work / f"cdhit_c{args.identity:.2f}"
     command = c.container(args.sif, c.CDHIT_EST, "-i", str(pooled), "-o", str(prefix) + ".fa",
                           "-c", f"{args.identity:.2f}", "-G", "0", "-aS", f"{args.coverage:.2f}",

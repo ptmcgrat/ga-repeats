@@ -30,6 +30,7 @@ import evaluate_merge as em  # noqa: E402
 import gene_overlap as go  # noqa: E402
 import repbase_match as rbm  # noqa: E402
 import gene_filter as gf  # noqa: E402
+import compare_concatenation as cc  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -413,6 +414,46 @@ class CopyNumberFilter(unittest.TestCase):
         counts = ml.full_length_copies(ml.consensus_hits(self.OUT), {"fam1": 1000, "fam2": 60})
         self.assertEqual(counts["fam1"], 2)   # copies 1 and 2
         self.assertEqual(counts["fam2"], 0)
+
+
+class ConcatenationTest(unittest.TestCase):
+    def _tmp(self):
+        import tempfile
+        return Path(tempfile.mkdtemp())
+
+    def test_fragmentation_counts_interspersed_annotations_and_elements(self):
+        bed = self._tmp() / "g.bed"
+        bed.write_text("#chrom\tstart\tend\tfamily\tscore\tstrand\tclass_family\tdivergence\tsw_score\trm_id\n"
+                       "chr1\t0\t100\tfamA\t0\t+\tLTR/Gypsy\t5\t300\t1\n"
+                       "chr1\t150\t250\tfamA\t0\t+\tLTR/Gypsy\t5\t280\t1\n"      # second fragment of element 1
+                       "chr1\t300\t330\t(CA)n\t0\t+\tSimple_repeat\t2\t40\t2\n"  # left out
+                       "chr2\t0\t50\tfamB\t0\t+\tDNA/hAT\t9\t200\t1\n")         # element 1 of another sequence
+        self.assertEqual(cc.fragmentation(bed), {"annotations": 3, "elements": 2, "median_length": 100})
+
+    def test_cluster_members_keeps_clusters_of_two_or_more(self):
+        table = self._tmp() / "cluster_table.tsv"
+        table.write_text("cluster\tfamily\tsource\n0\tA_rnd-1_family-1#LTR/Gypsy\tRI_v1\n"
+                         "0\tB_rnd-1_family-7#LTR/Gypsy\tRI_v2\n1\tC_rnd-2_family-4#DNA\tRI_v3\n")
+        self.assertEqual(cc.cluster_members(table), {"A_rnd-1_family-1": "0", "B_rnd-1_family-7": "0"})
+
+    def test_family_split(self):
+        member_of = {"f1": "0", "f2": "0", "f3": "1", "f4": "1", "f5": "1"}
+        rows = [("s", 0, 90, "f1", "LTR"), ("s", 100, 110, "f2", "LTR"), ("s", 200, 240, "f3", "DNA"),
+                ("s", 300, 335, "f4", "DNA"), ("s", 400, 425, "f5", "DNA"), ("s", 500, 600, "other", "LINE")]
+        split = cc.family_split(rows, member_of)
+        self.assertEqual(dict(split["0"]), {"f1": 90, "f2": 10})
+        s = cc.split_summary(split)
+        self.assertEqual((s["clusters"], s["bp"], s["clusters_no_member_half"], s["bp_no_member_half"], s["clusters_two_members_10pct"]),
+                         (2, 200, 1, 100, 2))
+        self.assertAlmostEqual(s["top_member_share"], (90 + 40) / 200)
+
+    def test_run_minutes_from_the_run_record(self):
+        scratch = self._tmp()
+        folder = scratch / "RI_v8" / "masking" / "DT_004f"
+        folder.mkdir(parents=True)
+        (folder / "run_record.json").write_text('{"started": "2026-11-17 10:05", "finished": "2026-11-17 14:35"}')
+        self.assertEqual(cc.run_minutes(scratch, "RI_v8", "DT_004f"), 270)
+        self.assertIsNone(cc.run_minutes(scratch, "RI_v5", "DT_004f"))
 
 
 class MergedVersionLookup(unittest.TestCase):
