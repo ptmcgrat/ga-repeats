@@ -3,7 +3,8 @@
 
 Evidence A, from gene_overlap.py's tables on the annotated genomes (--genomes): on every one of them,
   the family is the main masker of at least --a-host-genes genes of known multi-copy gene families
-  (HOST_FAMILIES; half or more of their CDS masked), or masks CDS in at least --a-genes genes.
+  (HOST_FAMILIES; half or more of their CDS masked), or masks CDS in at least --a-genes named genes
+  (uncharacterized gene models, mostly built from transposons, are not counted; repeats_020).
 Evidence B, from blastx: the family's consensus matches a host protein (evalue <= --b-evalue) with a
   bitscore at least --b-ratio times its best match to a transposon protein (RepeatPeps; 0 when none).
   Host proteins: the longest protein of each gene of --proteins-from, translated from its genome and
@@ -12,8 +13,14 @@ Evidence B, from blastx: the family's consensus matches a host protein (evalue <
   matches to RepeatPeps (evalue <= --host-te-evalue; domesticated transposon genes such as ZBED or NYNRIN)
   are left out. How much of each family the host match covers is recorded (repeats_019; the first version
   kept uncharacterized and transposon-derived host proteins and flagged real transposons).
-Decision (2026-11-13): flagged by A and B: removed. Flagged by one: removed unless repbase_match.py
-  found Repbase transposon support. Every flagged family is listed with its evidence.
+  Evidence B is strong when the host match covers at least --b-min-coverage of the family, or the host
+  gene belongs to a known multi-copy gene family (HOST_FAMILIES); otherwise weak, and weak B does not count.
+Decision (2026-11-13, refined 2026-11-14): flagged by A and strong B: removed. Flagged by one: removed unless
+  repbase_match.py found Repbase transposon support. Weak B alone: kept and listed (a family that is mostly
+  transposon with a small host-like stretch). Every flagged family is listed with its evidence.
+The report also estimates what the removals cost: the masked CDS of each annotated genome they account
+  for, and the masking of --impact-genome (default DT_004f) they account for. Both are upper bounds: after
+  masking again, other families cover some of those bases.
 
 Runs:
   no --go            the plan only; nothing is run.
@@ -45,11 +52,12 @@ sys.dont_write_bytecode = True  # keep __pycache__ out of the repository
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _common as c  # noqa: E402
 import gene_overlap as go  # noqa: E402
+import label_agreement as la  # noqa: E402
 
 HOST_FAMILIES = re.compile(
     r"NACHT|NLR family|NLRC|NLRP|LRR and PYD|tripartite motif|TRIM\d|immunoglobulin|novel immune-type receptor|"
     r"T cell receptor|MHC|major histocompatibility|olfactory|odorant|taste receptor|vomeronasal|protocadherin|"
-    r"zinc finger|histone|tubulin", re.IGNORECASE)
+    r"zinc finger|histone|tubulin|trace amine", re.IGNORECASE)
 DEFAULT_TE_PROTEINS = Path.home() / ".RepeatModelerCache" / "PROT-Dfam_4.0" / "repeatpeps.lib"
 BASES = "TCAG"
 AMINO = "FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG"
@@ -70,6 +78,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--a-genes", type=int, default=20)
     parser.add_argument("--b-evalue", type=float, default=1e-10)
     parser.add_argument("--b-ratio", type=float, default=2.0)
+    parser.add_argument("--b-min-coverage", type=float, default=0.30,
+                        help="host match coverage of the family for strong evidence B (default 0.30)")
+    parser.add_argument("--impact-genome", default="DT_004f",
+                        help="genome masked by --version on which to estimate the masking removed (default DT_004f)")
     parser.add_argument("--host-te-evalue", type=float, default=1e-5,
                         help="a host protein matching RepeatPeps at this evalue or lower is left out (default 1e-5)")
     parser.add_argument("--make-version", action="store_true", help="with --go: write the new version")
@@ -165,14 +177,17 @@ def evidence_a(genes_tables: Dict[str, List[dict]], families_tables: Dict[str, L
     hit: Dict[str, Dict[str, int]] = defaultdict(dict)
     for genome, rows in families_tables.items():
         for r in rows:
-            hit[r["family"]][genome] = int(r["other_genes_hit"])
+            if "named_genes_hit" not in r:
+                c.stop(f"the gene table for {genome} has no named_genes_hit column: run gene_overlap.py (repeats_020) again")
+            hit[r["family"]][genome] = int(r["named_genes_hit"])
     genomes = list(genes_tables)
     out = {}
     for fam in set(host_main) | set(hit):
         hm = [host_main[fam].get(g, 0) for g in genomes]
         gh = [hit[fam].get(g, 0) for g in genomes]
-        out[fam] = {"flag": all(x >= host_genes for x in hm) or all(x >= many_genes for x in gh),
-                    "host_main": hm, "genes_hit": gh}
+        by_families, by_named = all(x >= host_genes for x in hm), all(x >= many_genes for x in gh)
+        out[fam] = {"flag": by_families or by_named, "host_main": hm, "genes_hit": gh,
+                    "by": "both" if by_families and by_named else "gene families" if by_families else "named genes" if by_named else ""}
     return out
 
 
@@ -200,13 +215,31 @@ def evidence_b(host: Dict[str, tuple], te: Dict[str, tuple], evalue: float, rati
     return {q for q, h in host.items() if h[1] <= evalue and h[2] >= ratio * (te[q][2] if q in te else 0.0)}
 
 
-def decide(in_a: bool, in_b: bool, repbase_support: bool) -> Tuple[str, str]:
+def b_strength(hit: tuple, product: str, min_coverage: float) -> str:
+    """'strong' if the host match covers enough of the family or the host gene is a known multi-copy family, else 'weak'."""
+    covered = hit[3] is not None and hit[3] >= min_coverage
+    return "strong" if covered or HOST_FAMILIES.search(product or "") else "weak"
+
+
+def decide(in_a: bool, b: str, repbase_support: bool) -> Tuple[str, str]:
+    """b: 'strong', 'weak' or '' (no evidence B)."""
+    in_b = b == "strong"
     if in_a and in_b:
         return "remove", "A and B"
     if in_a or in_b:
         line = "A only" if in_a else "B only"
         return ("keep", f"{line}; Repbase transposon support") if repbase_support else ("remove", f"{line}; no Repbase support")
+    if b == "weak":
+        return "keep", "weak B only (small host match, not a gene family)"
     return "keep", ""
+
+
+def report_is_stale(report: Path) -> bool:
+    """A report written by an earlier rule (without the evidence_B_strength column)."""
+    if not report.exists():
+        return False
+    with open(report) as handle:
+        return "evidence_B_strength" not in handle.readline().rstrip("\n").split("\t")
 
 
 def read_tsv(path: Path) -> List[dict]:
@@ -237,9 +270,9 @@ def main(argv=None) -> None:
         c.stop("missing: " + ", ".join(missing))
     if args.make_version and target.exists():
         c.stop(f"{target} already exists; a version is never changed")
-    stale = stale_files(work)
+    stale = stale_files(work) + ([work / "filter_report.tsv"] if report_is_stale(work / "filter_report.tsv") else [])
     if stale:
-        c.stop("the work folder holds results of the first filter method (host proteins not cleaned); remove them with:\n"
+        c.stop("the work folder holds results of an earlier filter method; remove them with:\n"
                "  rm " + " ".join(str(p) for p in stale))
     if not args.go:
         print("dry run: nothing was run or written. Add --go to run.")
@@ -310,44 +343,73 @@ def main(argv=None) -> None:
     a = evidence_a(genes_tables, families_tables, args.a_host_genes, args.a_genes)
     b = evidence_b(results["host"], results["te"], args.b_evalue, args.b_ratio)
     repbase = {r["family"]: r for r in read_tsv(repbase_table)}
+    header = ["family", "label", "class", "length", "evidence_A", "evidence_A_by", "host_family_genes_mainly_masked",
+              "named_genes_masked", "evidence_B", "evidence_B_strength", "best_host_protein", "best_host_product",
+              "host_bitscore", "host_match_coverage_of_family", "best_te_protein", "te_bitscore",
+              "repbase_transposon_support", "repbase_entry", "repbase_label", "repbase_coverage", "decision", "reason"]
     rows, removed = [], []
     for name, fam in families.items():
         ev_a = a.get(fam.family, {})   # gene tables name families without their #class suffix
         in_a = ev_a.get("flag", False)
-        in_b = short_of[name] in b
-        if not (in_a or in_b):
+        host_hit, te_hit = results["host"].get(short_of[name]), results["te"].get(short_of[name])
+        strength = b_strength(host_hit, products.get(host_hit[0], ""), args.b_min_coverage) if short_of[name] in b else ""
+        if not (in_a or strength):
             continue
         rb = repbase.get(name, {})
-        decision, reason = decide(in_a, in_b, rb.get("transposon_support") == "yes")
-        host_hit, te_hit = results["host"].get(short_of[name]), results["te"].get(short_of[name])
-        rows.append([name, fam.label, fam.top_class, fam.length, "yes" if in_a else "no",
-                     "/".join(map(str, ev_a.get("host_main", []))), "/".join(map(str, ev_a.get("genes_hit", []))),
-                     "yes" if in_b else "no", host_hit[0] if host_hit else "", products.get(host_hit[0], "") if host_hit else "",
-                     f"{host_hit[2]:.0f}" if host_hit else "",
-                     f"{host_hit[3]:.2f}" if host_hit and host_hit[3] is not None else "",
-                     te_hit[0] if te_hit else "", f"{te_hit[2]:.0f}" if te_hit else "",
-                     rb.get("transposon_support", ""), rb.get("repbase_entry", ""), rb.get("repbase_label", ""),
-                     rb.get("coverage_of_family", ""), decision, reason])
+        decision, reason = decide(in_a, strength, rb.get("transposon_support") == "yes")
+        rows.append({"family": name, "label": fam.label, "class": fam.top_class, "length": fam.length,
+                     "evidence_A": "yes" if in_a else "no", "evidence_A_by": ev_a.get("by", ""),
+                     "host_family_genes_mainly_masked": "/".join(map(str, ev_a.get("host_main", []))),
+                     "named_genes_masked": "/".join(map(str, ev_a.get("genes_hit", []))),
+                     "evidence_B": "yes" if strength else "no", "evidence_B_strength": strength,
+                     "best_host_protein": host_hit[0] if host_hit else "",
+                     "best_host_product": products.get(host_hit[0], "") if host_hit else "",
+                     "host_bitscore": f"{host_hit[2]:.0f}" if host_hit else "",
+                     "host_match_coverage_of_family": f"{host_hit[3]:.2f}" if host_hit and host_hit[3] is not None else "",
+                     "best_te_protein": te_hit[0] if te_hit else "", "te_bitscore": f"{te_hit[2]:.0f}" if te_hit else "",
+                     "repbase_transposon_support": rb.get("transposon_support", ""), "repbase_entry": rb.get("repbase_entry", ""),
+                     "repbase_label": rb.get("repbase_label", ""), "repbase_coverage": rb.get("coverage_of_family", ""),
+                     "decision": decision, "reason": reason})
         if decision == "remove":
             removed.append(name)
-    covs = sorted(float(r[11]) for r in rows if r[7] == "yes" and r[11])
-    header = ["family", "label", "class", "length", "evidence_A", "host_family_genes_mainly_masked", "genes_masked",
-              "evidence_B", "best_host_protein", "best_host_product", "host_bitscore", "host_match_coverage_of_family",
-              "best_te_protein", "te_bitscore",
-              "repbase_transposon_support", "repbase_entry", "repbase_label", "repbase_coverage", "decision", "reason"]
+    table_rows = [[r[h] for h in header] for r in rows]
     report = work / "filter_report.tsv"
     if not report.exists():
-        c.write_tsv(report, header, rows)
-    n_a, n_b = sum(1 for r in rows if r[4] == "yes"), sum(1 for r in rows if r[7] == "yes")
-    both = sum(1 for r in rows if r[4] == r[7] == "yes")
-    reasons = Counter(r[-1] for r in rows)
-    print(f"\n{args.version}: {len(families):,} families; evidence A {n_a}, evidence B {n_b}, both {both}")
-    if covs:
-        print(f"  evidence B: the host match covers a median {covs[len(covs) // 2]:.0%} of the family "
-              f"(quartiles {covs[len(covs) // 4]:.0%}-{covs[3 * len(covs) // 4]:.0%})")
-    for reason, n in reasons.most_common():
+        c.write_tsv(report, header, table_rows)
+    n_a = sum(1 for r in rows if r["evidence_A"] == "yes")
+    n_strong = sum(1 for r in rows if r["evidence_B_strength"] == "strong")
+    n_weak = sum(1 for r in rows if r["evidence_B_strength"] == "weak")
+    both = sum(1 for r in rows if r["evidence_A"] == "yes" and r["evidence_B_strength"] == "strong")
+    a_by = Counter(r["evidence_A_by"] for r in rows if r["evidence_A"] == "yes")
+    print(f"\n{args.version}: {len(families):,} families; evidence A {n_a} (" + ", ".join(f"by {k} {v}" for k, v in a_by.most_common())
+          + f"); evidence B strong {n_strong}, weak {n_weak}; A and strong B {both}")
+    for reason, n in Counter(r["reason"] for r in rows).most_common():
         print(f"  {reason}: {n}")
     print(f"removed: {len(removed)} families ({', '.join(f'{k} {v}' for k, v in Counter(families[f].top_class for f in removed).most_common())})")
+
+    # what the removals cost (upper bounds: after masking again, other families cover some of these bases)
+    bare = {families[f].family for f in removed}
+    impact = {}
+    for g in args.genomes:
+        classes = read_tsv(genes_dir / f"{args.version}_{g}_classes.tsv")
+        total = next(int(r["cds_bp"]) for r in classes if r["gene_set"] == "genes without TE products" and r["class"] == "ALL")
+        masked = next(int(r["masked_bp"]) for r in classes if r["gene_set"] == "genes without TE products" and r["class"] == "ALL")
+        bp = sum(int(r["cds_bp_masked_in_other_genes"]) for r in families_tables[g] if r["family"] in bare)
+        impact[g] = {"cds_bp": total, "cds_masked_bp": masked, "cds_bp_masked_by_removed": bp}
+        print(f"  {g}: the removed families mask {100 * bp / total:.2f}% of CDS, of the {100 * masked / total:.2f}% masked now")
+    bed = c.version_folder(args.version) / "masked" / args.impact_genome / f"{args.impact_genome}.bed"
+    impact_fasta = c.genome_path(args.impact_genome, c.panel_accession(args.impact_genome))
+    if bed.exists() and impact_fasta.exists():
+        print(f"reading the masking of {args.impact_genome} ...", flush=True)
+        stretches = la.one_label_per_base(la.read_labelled_bed(bed))
+        genome_bp = sum(c.fasta_lengths(impact_fasta).values())
+        all_bp = sum(r[2] - r[1] for r in stretches)
+        rem_bp = sum(r[2] - r[1] for r in stretches if r[3] in bare)
+        impact[args.impact_genome] = {"genome_bp": genome_bp, "masked_bp": all_bp, "masked_by_removed_bp": rem_bp}
+        print(f"  {args.impact_genome}: the removed families mask {100 * rem_bp / genome_bp:.2f}% of the genome, "
+              f"of the {100 * all_bp / genome_bp:.2f}% masked now")
+    else:
+        print(f"  (no masking of {args.impact_genome} by {args.version}, or no genome file; genome masking not estimated)")
     print(f"table: {report}")
     if not args.make_version:
         print("report only: no version written. Review the table, then add --make-version.")
@@ -363,18 +425,20 @@ def main(argv=None) -> None:
         for name in kept:
             s = seqs[name]
             handle.write(f">{name}\n" + "".join(s[i:i + 60] + "\n" for i in range(0, len(s), 60)))
-    c.write_tsv(library_dir / "filter_table.tsv", header, rows)
+    c.write_tsv(library_dir / "filter_table.tsv", header, table_rows)
     record = {"version": args.new_version, "kind": "filtered library", "source_version": args.version,
               "source_library": {"path": str(library), "sha256": c.sha256(library)},
               "te_proteins": {"path": str(args.te_proteins), "sha256": c.sha256(args.te_proteins)},
               "host_proteins_from": args.proteins_from, "annotation": str(annotation),
               "gene_tables": {g: [str(p) for p in t] for g, t in tables.items()}, "repbase_table": str(repbase_table),
               "thresholds": {"a_host_genes": args.a_host_genes, "a_genes": args.a_genes, "b_evalue": args.b_evalue,
-                             "b_ratio": args.b_ratio, "host_te_evalue": args.host_te_evalue},
+                             "b_ratio": args.b_ratio, "host_te_evalue": args.host_te_evalue, "b_min_coverage": args.b_min_coverage},
+              "estimated_cost": impact,
               "host_set": "named proteins; uncharacterized and transposon products left out; RepeatPeps matches left out (blastp)",
-              "host_families_pattern": HOST_FAMILIES.pattern, "rule": "A and B: remove; one line: remove unless Repbase transposon support",
-              "counts": {"families_in": len(families), "removed": len(removed), "kept": len(kept),
-                         "evidence_A": n_a, "evidence_B": n_b, "both": both, "by_reason": dict(reasons)},
+              "host_families_pattern": HOST_FAMILIES.pattern, "rule": "A and strong B: remove; one line: remove unless Repbase transposon support; weak B alone: keep and list",
+              "counts": {"families_in": len(families), "removed": len(removed), "kept": len(kept), "evidence_A": n_a,
+                         "evidence_B_strong": n_strong, "evidence_B_weak": n_weak, "both": both,
+                         "by_reason": dict(Counter(r["reason"] for r in rows))},
               "written": f"{datetime.now():%Y-%m-%d %H:%M}",
               "ga_repeats_version": (Path(__file__).resolve().parent.parent / "VERSION").read_text().strip()}
     with open(library_dir / "filter_record.json", "x") as handle:

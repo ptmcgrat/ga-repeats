@@ -7,6 +7,8 @@ family and per gene. A transposable-element library should mask little coding se
 repeats in low-complexity protein stretches are expected; a family that masks coding sequence in
 many genes is likely gene-derived (a false family) or carries a captured gene fragment.
 
+The family table also counts, per family, the named genes it masks (named_genes_hit: products not called
+"uncharacterized", which are mostly gene models built from transposons).
 Genes whose annotated product names a transposable-element protein (see TE_PRODUCT below:
 transposase, reverse transcriptase, integrase, ...) are counted separately: masking those is
 expected, not a false positive. Each masked base keeps one label (its highest-scoring annotation).
@@ -37,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _common as c  # noqa: E402
 import label_agreement as la  # noqa: E402
 
+UNCHARACTERIZED = re.compile(r"uncharacterized", re.IGNORECASE)
 TE_PRODUCT = re.compile(
     r"transpos|retrotranspos|reverse transcriptase|integrase|\bgag\b|\bpol\b|piggybac|tigger|\bpogo\b|mariner|"
     r"\bhat\b|harbinger|helitron|endogenous retrovir|line-1|\bl1re", re.IGNORECASE)
@@ -131,12 +134,14 @@ def summarise(genes: Dict[str, dict], rows: List[la.Row]):
         top = max(fam_bp.items(), key=lambda kv: kv[1])[0] if fam_bp else ("", "")
         per_gene[gene] = (v["product"], v["te_like"], cds_bp, masked, top)
         for key, bp in fam_bp.items():
-            entry = families.setdefault(key, {"bp": 0, "genes": [], "te_genes": 0})
+            entry = families.setdefault(key, {"bp": 0, "genes": [], "named": [], "te_genes": 0})
             if v["te_like"]:
                 entry["te_genes"] += 1
             else:
                 entry["bp"] += bp
                 entry["genes"].append(gene)
+                if v["product"] and not UNCHARACTERIZED.search(v["product"]):
+                    entry["named"].append(gene)
     return classes, families, per_gene
 
 
@@ -183,9 +188,9 @@ def main(argv=None) -> None:
             table.append([args.assembly, args.version, name, g, total, bp, f"{100 * bp / total:.3f}" if total else ""])
     c.write_tsv(targets[0], ["assembly", "version", "gene_set", "class", "cds_bp", "masked_bp", "percent_of_cds"], table)
     fam_rows = sorted(families.items(), key=lambda kv: (-len(kv[1]["genes"]), -kv[1]["bp"]))
-    c.write_tsv(targets[1], ["family", "label", "class", "cds_bp_masked_in_other_genes", "other_genes_hit",
+    c.write_tsv(targets[1], ["family", "label", "class", "cds_bp_masked_in_other_genes", "other_genes_hit", "named_genes_hit",
                              "te_product_genes_hit", "example_genes"],
-                [[fam, label, la.group(label), v["bp"], len(v["genes"]), v["te_genes"], ",".join(sorted(v["genes"])[:8])]
+                [[fam, label, la.group(label), v["bp"], len(v["genes"]), len(v["named"]), v["te_genes"], ",".join(sorted(v["genes"])[:8])]
                  for (fam, label), v in fam_rows])
     gene_rows = sorted(((g, *v) for g, v in per_gene.items() if v[3]), key=lambda r: -r[4] / r[3])
     c.write_tsv(targets[2], ["gene", "product", "te_product", "cds_bp", "masked_bp", "percent_masked", "top_family", "top_label"],

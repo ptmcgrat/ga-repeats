@@ -446,7 +446,7 @@ class GeneOverlap(unittest.TestCase):
         total, by_class = classes["genes without TE products"]
         self.assertEqual((total, by_class), (140, {"Unknown": 30, "Other": 10}))
         self.assertEqual(classes["genes with TE products"], (100, {"DNA": 100}))
-        self.assertEqual(families[("fA", "Unknown")], {"bp": 30, "genes": ["g1"], "te_genes": 0})
+        self.assertEqual(families[("fA", "Unknown")], {"bp": 30, "genes": ["g1"], "named": ["g1"], "te_genes": 0})
         self.assertEqual(families[("fC", "DNA/hAT")]["te_genes"], 1)
         self.assertEqual(per_gene["g1"], ("myosin, heavy chain", False, 140, 40, ("fA", "Unknown")))
 
@@ -529,11 +529,33 @@ class GeneFilter(unittest.TestCase):
     def test_evidence_a_needs_every_genome(self):
         genes = {"G1": [{"te_product": "no", "percent_masked": "80", "top_family": "f1", "product": "NACHT, LRR and PYD domains-containing protein 3"}] * 5,
                  "G2": [{"te_product": "no", "percent_masked": "80", "top_family": "f1", "product": "NLR family CARD domain-containing protein 3"}] * 5}
-        fams = {"G1": [{"family": "f2", "other_genes_hit": "25"}], "G2": [{"family": "f2", "other_genes_hit": "19"}]}
+        fams = {"G1": [{"family": "f2", "other_genes_hit": "40", "named_genes_hit": "25"}, {"family": "f3", "other_genes_hit": "60", "named_genes_hit": "21"}],
+                "G2": [{"family": "f2", "other_genes_hit": "40", "named_genes_hit": "19"}, {"family": "f3", "other_genes_hit": "60", "named_genes_hit": "22"}]}
         a = gf.evidence_a(genes, fams, 5, 20)
         self.assertTrue(a["f1"]["flag"])
-        self.assertFalse(a["f2"]["flag"])          # 19 genes on G2
+        self.assertEqual(a["f1"]["by"], "gene families")
+        self.assertFalse(a["f2"]["flag"])          # 19 named genes on G2; uncharacterized models do not count
         self.assertEqual(a["f2"]["genes_hit"], [25, 19])
+        self.assertEqual((a["f3"]["flag"], a["f3"]["by"]), (True, "named genes"))
+
+    def test_evidence_a_needs_the_named_gene_count(self):
+        with self.assertRaises(SystemExit):
+            gf.evidence_a({"G1": []}, {"G1": [{"family": "f2", "other_genes_hit": "25"}]}, 5, 20)
+
+    def test_strong_and_weak_evidence_b(self):
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.45), "early endosome antigen 1", 0.30), "strong")
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "protein NLRC3", 0.30), "strong")
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "trace amine-associated receptor 13c", 0.30), "strong")
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "early endosome antigen 1", 0.30), "weak")
+
+    def test_a_report_from_an_earlier_rule_is_stale(self):
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        (d / "old.tsv").write_text("family\tevidence_A\tevidence_B\n")
+        (d / "new.tsv").write_text("family\tevidence_A\tevidence_B\tevidence_B_strength\n")
+        self.assertTrue(gf.report_is_stale(d / "old.tsv"))
+        self.assertFalse(gf.report_is_stale(d / "new.tsv"))
+        self.assertFalse(gf.report_is_stale(d / "absent.tsv"))
 
     def test_evidence_b_compares_with_transposon_proteins(self):
         host = gf.best_hits(["q1 h1 1e-30 300", "q1 h2 1e-20 200", "q2 h1 1e-30 300", "q3 h3 1e-8 120"])
@@ -554,10 +576,12 @@ class GeneFilter(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in gf.stale_files(work)), ["blastx_host.tsv", "host_db.pdb", "host_proteins.fa"])
 
     def test_decision_rule(self):
-        self.assertEqual(gf.decide(True, True, True), ("remove", "A and B"))
-        self.assertEqual(gf.decide(True, False, True), ("keep", "A only; Repbase transposon support"))
-        self.assertEqual(gf.decide(False, True, False), ("remove", "B only; no Repbase support"))
-        self.assertEqual(gf.decide(False, False, False), ("keep", ""))
+        self.assertEqual(gf.decide(True, "strong", True), ("remove", "A and B"))
+        self.assertEqual(gf.decide(True, "", True), ("keep", "A only; Repbase transposon support"))
+        self.assertEqual(gf.decide(True, "weak", False), ("remove", "A only; no Repbase support"))
+        self.assertEqual(gf.decide(False, "strong", False), ("remove", "B only; no Repbase support"))
+        self.assertEqual(gf.decide(False, "weak", False), ("keep", "weak B only (small host match, not a gene family)"))
+        self.assertEqual(gf.decide(False, "", False), ("keep", ""))
 
     def test_a_filtered_version_uses_its_own_library(self):
         import tempfile
