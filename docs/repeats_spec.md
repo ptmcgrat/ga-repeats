@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.19, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2; 0.19: merge kept; tags by coverage only)
+**Document version:** 0.20, 2026-11-18 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2; 0.19: merge kept; tags by coverage only; 0.20: the first verification results; the known insertions anchored on published sequence)
 **Owner:** McGrath lab
-**Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); the concatenation test done (`RI_v8`); the question 2 verification panel being set up on `RI_v5`; **section 8 says where things stand**
+**Status:** question 1 answered (one library per ecogroup); merge settings decided; tags by coverage only (`RI_v6` to be written); the question 2 checks under way on `RI_v5`; **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -403,6 +403,8 @@ has tried.
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
 | Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
 | Does the final masking add `-a` (alignments), for an exact (Kimura) divergence landscape? | before the final masking |
+| The *mitfa* insertion in MC_MC1m (2,087 bp intron 1 against 678 bp without it): our library masks 1,388 bp of it as LTR/Gypsy and LTR/Pao, the published annotation (Carleton et al. 2020, CENSOR) is mainly Rex1 (LINE); which is right? | no |
+| What is MZ_MZ4f_rnd-5_family-9801 (Unknown, 13.4 kb consensus, 12.9 Mb of DT_004f at 3-4% divergence in joined, tandem-like annotations)? Possibly of interest to project 2b, through the coordinator once characterized | no |
 | The host-gene tag in the shared `repeats` contract, and whether masked genomes used by other projects should include tagged families (through the coordinator) | before first integration |
 | How much coding sequence may the final library mask? (no published threshold; per gene, about 4% of human genes carry transposon sequence in coding regions) | **yes, before the library is accepted** |
 | The earlier RepeatMasker annotation of LG2, LG10 and LG13 in seven annotated assemblies (an old RepeatMasker, a library from GT3a alone): another de novo library, so not an accuracy reference; worth a consistency comparison? | no |
@@ -479,12 +481,28 @@ SINE 0.7% (8%), Unknown 8.8% (10%). About half of DNA, LINE and LTR bases lie wi
 spike at 3-4% (1.54% of the genome, three to five times its neighbouring bins), to be traced to its families. SINEs have few
 young copies (8% within 1%).
 
-**Next** (`repeats_023`): the verification panel on `RI_v5`: `family_recovery.py` (165 cichlid Repbase entries: DNA 115,
-LINE 24, LTR 20, SINE 3, Satellite 3) and `divergence_landscape.py` now; `RI_v5` masks MZ_MZ4f and YH_YH2f (lineage-specific
-loss, `own_genome_loss.py`) and the five other annotated genomes (CV_CV1m, MC_MC1m, RC_006pf, YH_YH1m, AS_Sanger); then
-`known_insertions.py` on the eight annotated genomes and `chromosome_masking.py` on all eleven masked. Waiting: the inconsistency
-measure (EDTA's script to be read), residual repeats (final library), the same-genome comparison (fAstCal1.2, coordinator).
-Then the tagging report on `RI_v5` by coverage only (`repeats_024`), and `RI_v6`. Nothing is ready to integrate.
+**Verification on `RI_v5`, first results** (2026-11-17 and -18):
+- *Tagging by coverage only:* 178 families tagged (Unknown 100, LTR 28, LINE 27, DNA 16, Satellite 6, Retroposon 1; categories
+  OTHER 67, NLR 31, MULTI 28, IMMUNE 15, TRIM 12, PCDH 7, ZNF 6, OR 5, HIST 2, TUB 2, TAAR 2, TASTE 1); tagged families mask
+  5.4-5.7% of coding sequence and 1.26% of DT_004f (the earlier rule: 304 families, 2.05%).
+- *Lineage-specific loss:* on its own build genome, `RI_v5` misses 0.107% of what `RI_v1` masks on MZ_MZ4f and 0.122% of what
+  `RI_v3` masks on YH_YH2f, and masks 3.2-3.4 points more; 86-87% of shared bases get the same class.
+- *LG3:* the most-masked chromosome in all eleven masked assemblies (63-70%, against 43.5-45% genome-wide). Across ten of them its
+  length varies 64-87 Mb while its unmasked part stays 23-27 Mb: each extra Mb is 0.86 Mb of masked sequence. DT_004f's LG3 is
+  27% gap (28.4 Mb of N) and 67.5% masked over non-gap sequence; DT_004f is 2.98% gap overall. Three assemblies list the
+  mitochondrion (MT) as a chromosome.
+- *Unknown spike at 3-4%:* one family, MZ_MZ4f_rnd-5_family-9801 (13.4 kb consensus), masks 12.9 Mb of DT_004f in 102
+  annotations averaging about 127 kb: joined copies of a tandemly repeated consensus.
+- *Known insertions:* *mitfa* intron 1 is 678 bp without the insertion (Carleton et al. 2020, Fig. S4C). MZ_NMK2024a,
+  AC_fAstCal68, RC_006pf, YH_YH1m and AS_Sanger have a 676-679 bp intron with no repeats (no insertion, as expected for MZ and
+  AC); MC_MC1m's is 2,087 bp (the insertion), 1,388 bp of it masked as LTR/Gypsy and LTR/Pao (section 7); DT_005m and CV_CV1m
+  lack that transcript. At *rx1*, no Rex-Babar in any of the eight 5 kb windows; the state needs the sequence-anchored check.
+
+**Next** (`repeats_025`): write `RI_v6`; `insertion_sites.py` on the eleven masked assemblies (*mitfa*, *rx1* and *tbx2a*,
+anchored on Carleton et al.'s Table S4); `chromosome_masking.py` again, with gaps; `family_profile.py` on
+MZ_MZ4f_rnd-5_family-9801; `family_recovery.py` (not yet run). Waiting: the inconsistency measure (EDTA's script), residual
+repeats (final library), the same-genome comparison (fAstCal1.2, coordinator), *fhl2b* (its sequence or position).
+Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the

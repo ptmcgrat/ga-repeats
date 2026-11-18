@@ -36,6 +36,8 @@ import own_genome_loss as ogl  # noqa: E402
 import chromosome_masking as chm  # noqa: E402
 import divergence_landscape as dl  # noqa: E402
 import family_recovery as fr  # noqa: E402
+import insertion_sites as ins  # noqa: E402
+import family_profile as fp  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -567,6 +569,84 @@ class FamilyRecoveryTest(unittest.TestCase):
         self.assertEqual(fr.classify([], 1000)["category"], "not found")
         best = fr.classify(good, 1000)
         self.assertEqual((best["sequences_80"], round(best["coverage_95"], 3)), (2, 1.0))
+
+
+class InsertionSitesTest(unittest.TestCase):
+    H = ins.Hit
+
+    def test_probes_are_plain_sequence(self):
+        for s in (ins.MITFA_LEFT, ins.MITFA_RIGHT, ins.RX1_LEFT, ins.RX1_RIGHT, ins.TBX2A_REGION):
+            self.assertTrue(set(s) <= set("ACGT"))
+        self.assertEqual((len(ins.MITFA_LEFT), len(ins.MITFA_RIGHT), len(ins.RX1_LEFT), len(ins.RX1_RIGHT), len(ins.TBX2A_REGION)),
+                         (294, 215, 100, 104, 1332))
+
+    def test_site_between_flanks_on_both_strands(self):
+        # + strand: left flank ends at 1,000 (its last 4 bases unaligned), right flank starts at 2,409 (its first 2 unaligned)
+        left = self.H("mitfa_left", "chr5", 99.0, 1, 290, 711, 1000, 500.0, 294)
+        right = self.H("mitfa_right", "chr5", 99.0, 3, 215, 2409, 2621, 400.0, 215)
+        self.assertEqual(ins.site_between(left, right), (1004, 2406))      # 1,402 bases between the flanks
+        # - strand: the right flank lies at lower coordinates
+        left_m = self.H("mitfa_left", "chr5", 99.0, 1, 294, 3000, 2707, 500.0, 294)
+        right_m = self.H("mitfa_right", "chr5", 99.0, 1, 215, 2706, 2492, 400.0, 215)
+        self.assertEqual(ins.site_between(left_m, right_m), (2706, 2706))  # adjacent: nothing between
+        self.assertIsNone(ins.site_between(left, right_m))                  # different strands
+        far = self.H("mitfa_right", "chr5", 99.0, 1, 215, 50000, 50214, 400.0, 215)
+        self.assertIsNone(ins.site_between(left, far))                      # too far apart
+
+    def test_best_site_and_state(self):
+        hits = [self.H("rx1_left", "c", 98.0, 1, 100, 101, 200, 180.0, 100), self.H("rx1_right", "c", 98.0, 1, 104, 615, 718, 190.0, 104),
+                self.H("rx1_left", "c", 91.0, 1, 100, 9001, 9100, 120.0, 100)]          # a weaker copy elsewhere
+        _s, left, right, (start, end) = ins.best_site(hits, "rx1_left", "rx1_right")
+        self.assertEqual((left.sstart, end - start), (101, 414))
+        states = ins.FLANKED["rx1"][3]
+        self.assertEqual([ins.state_of(n, states) for n in (0, 414, 780, 2000)],
+                         ["deletion (as M. zebra)", "ancestral (413 bp)", "insertion (413 + 268-421 bp)", "other (2,000 bp)"])
+        self.assertEqual(ins.state_of(1410, ins.FLANKED["mitfa"][3]), "insertion (1,408 bp published)")
+
+    def test_tbx2a_locus_is_where_the_unique_part_aligns(self):
+        hits = [self.H("tbx2a_region", "c10", 99.0, 1, 1332, 50001, 51332, 2000.0, 1332),   # the locus: the whole probe
+                self.H("tbx2a_region", "c10", 95.0, 300, 1332, 90001, 91033, 1500.0, 1332),  # another copy of the repeat part
+                self.H("tbx2a_region", "c10", 94.0, 300, 1332, 120001, 121033, 1400.0, 1332)]
+        seq, start, end, aligned, unique, repeated = ins.tbx2a_locus(hits)
+        self.assertEqual((seq, start, end, aligned, unique, repeated), ("c10", 50000, 51332, 1332, 299, 1033))
+
+    def test_chromosomes_are_written_out_of_the_genome(self):
+        import gzip
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        with gzip.open(d / "g.fna.gz", "wt") as f:
+            f.write(">CM5.1 chromosome 5\nACGT\nAC\n>CM9.1\nGGGG\n>CM10.1\nTTTT\n")
+        (d / "r.jsonl").write_text('{"chrName": "LG5", "role": "assembled-molecule", "genbankAccession": "CM5.1"}\n'
+                                   '{"chrName": "9", "role": "assembled-molecule", "genbankAccession": "CM9.1"}\n'
+                                   '{"chrName": "10", "role": "assembled-molecule", "genbankAccession": "CM10.1"}\n')
+        found = ins.chromosome_sequences(d / "g.fna.gz", d / "r.jsonl", {"5": d / "c5.fa", "10": d / "c10.fa", "23": d / "c23.fa"})
+        self.assertEqual(found, {"5": "CM5.1", "10": "CM10.1"})
+        self.assertEqual((d / "c5.fa").read_text(), ">CM5.1\nACGT\nAC\n")
+
+
+class ChromosomeGapsTest(unittest.TestCase):
+    def test_gaps_and_non_gap_shares(self):
+        gaps = chm.gap_counts([">s1 x", "ACGTNNNN", "nnAC", ">s2", "ACGT"])
+        self.assertEqual(dict(gaps), {"s1": 6, "s2": 0})
+        names = {"s1": ("3", 12), "s2": ("4", 4)}
+        stats = chm.per_chromosome(names, [("s1", 0, 3, "f", "LTR", 100)], [("s1", 0, 3, "f", "LTR")], gaps)
+        self.assertEqual((stats["3"]["length"], stats["3"]["gaps"], stats["3"]["masked"]), (12, 6, 3))
+
+
+class FamilyProfileTest(unittest.TestCase):
+    def test_annotations_and_arrays(self):
+        lines = ["#chrom\tstart\tend\tfamily\tscore\tstrand\tclass_family\tdivergence\tsw_score\trm_id",
+                 "s\t0\t5000\tF\t0\t+\tUnknown\t3.5\t9\t1", "s\t5500\t30000\tF\t0\t+\tUnknown\t3.2\t9\t2",
+                 "s\t40000\t41000\tF\t0\t+\tUnknown\t8.0\t9\t3", "s\t100\t200\tG\t0\t+\tDNA\t1.0\t9\t4"]
+        anns = fp.family_annotations(lines, "F")
+        self.assertEqual(len(anns), 3)
+        self.assertEqual(fp.arrays(anns, 1000), [("s", 0, 30000, 2, 29500), ("s", 40000, 41000, 1, 1000)])
+
+    def test_period_from_self_matches(self):
+        # a 3,000 bp consensus made of a 1,000 bp unit three times: off-diagonal matches at offsets 1,000 and 2,000
+        hits = [(1, 3000, 1, 3000), (1, 2000, 1001, 3000), (1001, 3000, 1, 2000), (1, 1000, 2001, 3000), (2001, 3000, 1, 1000)]
+        self.assertEqual(fp.period(hits, 3000), (1000, 3000))
+        self.assertEqual(fp.period([(1, 3000, 1, 3000)], 3000), (0, 0))
 
 
 class MergedVersionLookup(unittest.TestCase):

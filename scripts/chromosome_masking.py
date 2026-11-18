@@ -5,9 +5,11 @@ Kumar et al. 2025 describe chromosome 3 as highly repetitive and as a place wher
 from other assemblies; in the P1 download its length varies 1.8-fold across assemblies (58.7-105.3 Mb). This asks
 whether LG3's masked share is high, and whether it tracks those length differences (a question, not a finding).
 
-For each assembly masked by the version: every chromosome's length, masked bases (any annotation) and class shares
-(one label per base: the highest-scoring annotation); sequences not assigned to a chromosome are pooled as
-"unplaced". Chromosome names come from NCBI's sequence_report.jsonl beside the genome (fields chrName, genbankAccession,
+For each assembly masked by the version: every chromosome's length, its gaps (runs of N, counted in the genome), masked
+bases (any annotation) and class shares (one label per base: the highest-scoring annotation); shares are given over the
+sequence without gaps (repeats_025: DT_004f's LG3 is 27% gap, which made it look under-masked), and the raw share too.
+Sequences not assigned to a chromosome are pooled as "unplaced"; the mitochondrion appears as MT where an assembly
+lists it. Chromosome names come from NCBI's sequence_report.jsonl beside the genome (fields chrName, genbankAccession,
 refseqAccession, length, role); the script stops if the report names none of the masked sequences. LG3 is the
 chromosome named 3, LG3 or chr3.
 
@@ -19,6 +21,7 @@ Writes, never overwriting, <scratch>/comparisons/chromosomes/<version>_chromosom
 chromosome).
 """
 import argparse
+import gzip
 import json
 import re
 import statistics
@@ -61,12 +64,26 @@ def chromosome_names(lines: Iterable[str]) -> Tuple[Dict[str, Tuple[str, int]], 
     return genbank, refseq
 
 
-def per_chromosome(names: Dict[str, Tuple[str, int]], raw: Iterable[la.Scored], rows: Iterable[la.Row]) -> Dict[str, Counter]:
-    """names: each genome sequence once -> (chromosome, length). Per chromosome: length, masked (any annotation) and
-    bases per class group (one label per base)."""
+def gap_counts(lines: Iterable[str]) -> Counter:
+    """Sequence name -> number of N (either case), from FASTA lines."""
+    gaps: Counter = Counter()
+    name = None
+    for line in lines:
+        if line.startswith(">"):
+            name = line[1:].split()[0]
+        elif name is not None:
+            gaps[name] += line.count("N") + line.count("n")
+    return gaps
+
+
+def per_chromosome(names: Dict[str, Tuple[str, int]], raw: Iterable[la.Scored], rows: Iterable[la.Row],
+                   gaps: Counter = None) -> Dict[str, Counter]:
+    """names: each genome sequence once -> (chromosome, length). Per chromosome: length, gaps, masked (any annotation)
+    and bases per class group (one label per base)."""
     out: Dict[str, Counter] = defaultdict(Counter)
-    for chrom, length in names.values():
+    for seq, (chrom, length) in names.items():
         out[chrom]["length"] += length
+        out[chrom]["gaps"] += (gaps or {}).get(seq, 0)
     for seq, spans in c.merge_by_sequence((r[0], r[1], r[2]) for r in raw).items():
         out[names.get(seq, (UNPLACED, 0))[0]]["masked"] += sum(b - a for a, b in spans)
     for seq, a, b, _family, label in rows:
@@ -93,7 +110,10 @@ def main(argv=None) -> None:
     out_dir = args.scratch / "comparisons" / "chromosomes"
     target = out_dir / f"{args.version}_chromosomes.tsv"
     if target.exists():
-        c.stop(f"{target} exists; results are never overwritten")
+        with open(target) as handle:
+            old = "gap_bp" not in handle.readline().split("\t")
+        c.stop(f"{target} exists" + (f" from the earlier version (without gaps); remove it with: rm {target}" if old
+                                     else "; results are never overwritten"))
     print(f"{args.version}: masking per chromosome in " + ", ".join(a for a, _, _ in plan) + f"\nresult: {target}")
     if not args.go:
         print("dry run: nothing was read or written. Add --go to run.")
@@ -108,34 +128,43 @@ def main(argv=None) -> None:
         names = max((genbank, refseq), key=lambda m: len(masked_seqs & set(m)))   # the accessions this genome uses
         if not masked_seqs & set(names):
             c.stop(f"{assembly}: the sequence report names none of the masked sequences; check its fields ({report})")
-        stats = per_chromosome(names, raw, la.one_label_per_base(raw))
-        total_len = sum(s["length"] for s in stats.values())
+        print(f"{assembly}: counting gaps ...", flush=True)
+        with gzip.open(c.genome_path(assembly, c.panel_accession(assembly)), "rt") as handle:
+            gaps = gap_counts(handle)
+        stats = per_chromosome(names, raw, la.one_label_per_base(raw), gaps)
+        total_len = sum(s["length"] - s["gaps"] for s in stats.values())
         total_masked = sum(s["masked"] for s in stats.values())
         placed = {}
         for chrom in sorted(stats, key=chromosome_order):
             s = stats[chrom]
-            if not s["length"]:
+            real = s["length"] - s["gaps"]
+            if real <= 0:
                 continue
-            share = 100 * s["masked"] / s["length"]
+            share = 100 * s["masked"] / real
             if chrom != UNPLACED:
                 placed[chrom] = share
-            table.append([assembly, chrom, s["length"], s["masked"], f"{share:.2f}"]
-                         + [f"{100 * s[g] / s['length']:.2f}" for g in la.GROUPS])
+            table.append([assembly, chrom, s["length"], s["gaps"], s["masked"], f"{100 * s['masked'] / s['length']:.2f}",
+                          f"{share:.2f}"] + [f"{100 * s[g] / real:.2f}" for g in la.GROUPS])
         three = next((k for k in placed if LG3.match(k)), None)
-        line = (f"{assembly}: genome {100 * total_masked / total_len:.2f}% masked; chromosomes "
+        gap_total = sum(s["gaps"] for s in stats.values())
+        line = (f"{assembly}: gaps {100 * gap_total / (total_len + gap_total):.2f}%; genome {100 * total_masked / total_len:.2f}% "
+                f"of non-gap sequence masked; chromosomes "
                 f"{min(placed.values()):.1f}-{max(placed.values()):.1f}% (median {statistics.median(placed.values()):.1f}%)"
                 if placed else f"{assembly}: no chromosomes named in the report")
         if three:
             rank = sorted(placed.values(), reverse=True).index(placed[three]) + 1
-            line += f"; LG3 ({three}) {stats[three]['length'] / 1e6:.1f} Mb, {placed[three]:.1f}% masked, rank {rank} of {len(placed)}"
-            lg3.append((assembly, stats[three]["length"], placed[three], stats[three]))
+            real3 = stats[three]["length"] - stats[three]["gaps"]
+            line += (f"; LG3 ({three}) {stats[three]['length'] / 1e6:.1f} Mb ({stats[three]['gaps'] / 1e6:.1f} Mb gap), "
+                     f"{placed[three]:.1f}% of non-gap masked, rank {rank} of {len(placed)}")
+            lg3.append((assembly, real3, placed[three], stats[three]))
         print(line)
     if lg3:
-        print("\nLG3 across assemblies (length, masked share, class shares of the chromosome):")
+        print("\nLG3 across assemblies (non-gap length, masked share and class shares of the non-gap sequence):")
         for assembly, length, p, s in sorted(lg3, key=lambda x: x[1]):
             print(f"  {assembly:<14} {length / 1e6:6.1f} Mb  {p:5.1f}%  " + ", ".join(f"{g} {100 * s[g] / length:.1f}" for g in la.GROUPS))
     out_dir.mkdir(parents=True, exist_ok=True)
-    c.write_tsv(target, ["assembly", "chromosome", "length", "masked_bp", "masked_percent"] + [f"{g}_percent" for g in la.GROUPS], table)
+    c.write_tsv(target, ["assembly", "chromosome", "length", "gap_bp", "masked_bp", "masked_percent_of_length",
+                         "masked_percent_of_non_gap"] + [f"{g}_percent_of_non_gap" for g in la.GROUPS], table)
     print(f"table: {target}")
 
 
