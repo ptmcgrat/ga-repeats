@@ -11,7 +11,9 @@ Identity is 100 - RepeatMasker's "perc div." (mismatches; indels not counted); l
 
 The curated families are the Repbase entries of the chosen species (--species; default the 165 cichlid entries:
 Cichlidae and Oreochromis_niloticus), taken from the classified Repbase that repbase_match.py built
-(<scratch>/repbase/<release>/repbase.fa and repbase_entries.tsv); run repbase_match.py first.
+(<scratch>/repbase/<release>/repbase.fa and repbase_entries.tsv); run repbase_match.py first. Lengths are those of the
+sequences searched; where a name occurs twice in the classified Repbase, the first copy is used and the duplicates are
+listed (repeats_026: REX1-4_AFC had shown a coverage of 2.93 against the table's length).
 
 Usage (from the repository root):
   python scripts/family_recovery.py --version RI_v5                                  # dry run
@@ -33,6 +35,7 @@ from typing import Dict, Iterable, List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _common as c  # noqa: E402
+import curated_annotation as ca  # noqa: E402
 
 CATEGORIES = ["perfect", "good", "present", "not found"]
 Hit = Tuple[str, str, float, int, int]   # our sequence, curated family, identity, consensus start, consensus end (1-based)
@@ -120,13 +123,10 @@ def main(argv=None) -> None:
     work.mkdir(parents=True)
     wanted = {r["name"] for r in entries}
     curated = work / "curated.fa"
-    keep = False
-    with open(repbase_fa) as src, open(curated, "x") as dst:
-        for line in src:
-            if line.startswith(">"):
-                keep = line[1:].split("#", 1)[0].strip() in wanted
-            if keep:
-                dst.write(line)
+    lengths, duplicates = ca.write_curated(repbase_fa, wanted, curated)
+    if duplicates:
+        print(f"note: {len(set(duplicates))} entry names occur more than once in {repbase_fa.name}; the first copy is used "
+              f"(repeats_026): " + ", ".join(sorted(set(duplicates))[:10]))
     families = [f.name for f in c.read_families(library)]
     names = {f"q{i:06d}": name for i, name in enumerate(families, start=1)}
     sequences, current = {}, None
@@ -153,9 +153,10 @@ def main(argv=None) -> None:
 
     rows, summary = [], Counter()
     for r in sorted(entries, key=lambda r: (r["type"], r["name"])):
-        res = classify(per_family.get(r["name"], []), int(r["length"]))
+        length = lengths.get(r["name"]) or int(r["length"])   # the sequence searched (repeats_026), else the table
+        res = classify(per_family.get(r["name"], []), length)
         summary[(r["type"], res["category"])] += 1
-        rows.append([r["name"], r["type"], r["subtype"], r["length"], res["category"], names.get(res["best"], ""),
+        rows.append([r["name"], r["type"], r["subtype"], length, res["category"], names.get(res["best"], ""),
                      f"{res['best_identity']:.1f}" if res["best"] else "", f"{res['best_coverage']:.3f}",
                      f"{res['coverage_95']:.3f}", f"{res['coverage_80']:.3f}", res["sequences_80"]])
     types = [t for t, _ in by_type.most_common()]

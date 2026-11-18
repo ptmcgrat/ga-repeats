@@ -38,6 +38,9 @@ import divergence_landscape as dl  # noqa: E402
 import family_recovery as fr  # noqa: E402
 import insertion_sites as ins  # noqa: E402
 import family_profile as fp  # noqa: E402
+import composite_families as cf  # noqa: E402
+import curated_annotation as ca  # noqa: E402
+import site_annotation as sa  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -647,6 +650,64 @@ class FamilyProfileTest(unittest.TestCase):
         hits = [(1, 3000, 1, 3000), (1, 2000, 1001, 3000), (1001, 3000, 1, 2000), (1, 1000, 2001, 3000), (2001, 3000, 1, 1000)]
         self.assertEqual(fp.period(hits, 3000), (1000, 3000))
         self.assertEqual(fp.period([(1, 3000, 1, 3000)], 3000), (0, 0))
+
+
+class CompositeFamiliesTest(unittest.TestCase):
+    ARGS = __import__("argparse").Namespace(min_identity=90.0, min_length=300, min_entry=0.8, min_family=0.8)
+
+    def test_parsing_and_joining_fragments(self):
+        lines = ["  900  2.0  0.0  0.0  q000001  101  500  (3500)  +  hAT-8_AFC  DNA/hAT-Ac  1  400  (728)  1",
+                 "  900  4.0  0.0  0.0  q000001  601  1300  (2700)  C  hAT-8_AFC  DNA/hAT-Ac  (0)  1128  429  1"]
+        hits = cf.parse_hits(lines)
+        self.assertEqual(hits[1], ("q000001", "hAT-8_AFC", "DNA/hAT-Ac", 96.0, 601, 1300, 429, 1128))
+        m = cf.join_matches(hits, {"hAT-8_AFC": 1128})[("q000001", "hAT-8_AFC")]
+        self.assertEqual(m["query_bp"], 1100)
+        self.assertAlmostEqual(m["entry_share"], 1100 / 1128)   # entry bases 1-400 and 429-1128
+        self.assertAlmostEqual(m["identity"], (98.0 * 400 + 96.0 * 700) / 1100)
+
+    def test_classes_of_match(self):
+        m = lambda label, ident, qbp, share: {"label": label, "identity": ident, "query_bp": qbp, "entry_share": share}
+        A = self.ARGS
+        self.assertEqual(cf.classify("LTR/Gypsy", 6000, m("DNA/hAT-Ac", 97.6, 1100, 0.97), A), "composite")
+        self.assertEqual(cf.classify("LINE/L2", 1200, m("DNA/hAT-Ac", 97.0, 1100, 0.97), A), "relabel")   # 92% of the family
+        self.assertEqual(cf.classify("Unknown", 1200, m("DNA/hAT-Ac", 97.0, 1100, 0.97), A), "unknown")
+        self.assertEqual(cf.classify("LTR/Gypsy", 6000, m("DNA/hAT-Ac", 97.0, 400, 0.35), A), "partial")
+        self.assertEqual(cf.classify("DNA/hAT-Charlie", 6000, m("DNA/hAT-Ac", 97.0, 1100, 0.97), A), "")  # same class group
+        self.assertEqual(cf.classify("LTR/Gypsy", 6000, m("DNA/hAT-Ac", 85.0, 1100, 0.97), A), "")        # identity too low
+        self.assertEqual(cf.classify("LTR/Gypsy", 6000, m("DNA/hAT-Ac", 97.0, 250, 0.97), A), "")         # too short
+
+
+class CuratedAnnotationTest(unittest.TestCase):
+    def test_curated_entries_written_once(self):
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        (d / "rb.fa").write_text(">A#DNA/hAT\nACGT\nAC\n>B#LINE/L2\nGGG\n>A#DNA/hAT\nTTTTTTTT\n>C#LTR\nCC\n")
+        lengths, dups = ca.write_curated(d / "rb.fa", {"A", "C"}, d / "out.fa")
+        self.assertEqual((lengths, dups), ({"A": 6, "C": 2}, ["A"]))
+        self.assertEqual((d / "out.fa").read_text(), ">A#DNA/hAT\nACGT\nAC\n>C#LTR\nCC\n")
+
+    def test_overlaps(self):
+        a = [("s", 0, 100, "cur1", "DNA/hAT"), ("s", 200, 300, "cur2", "LINE/L2"), ("t", 0, 50, "cur3", "DNA")]
+        b = [("s", 50, 120, "f1", "LTR/Gypsy"), ("s", 120, 250, "f2", "DNA"), ("s", 290, 400, "f3", "LINE")]
+        got = [(ra[3], rb[3], n) for ra, rb, n in ca.overlaps(a, b)]
+        self.assertEqual(got, [("cur1", "f1", 50), ("cur2", "f2", 50), ("cur2", "f3", 10)])
+
+
+class SiteAnnotationTest(unittest.TestCase):
+    def test_sites_and_cutting(self):
+        import gzip
+        import io
+        import tempfile
+        tsv = io.StringIO("assembly\tlocus\tseq\tstart\tend\tlength\n"
+                          "MC\tmitfa\tchr5\t4\t10\t6\nMZ\trx1\tchr23\t7\t7\t0\nRC\ttbx2a\t\t\t\t\n")
+        sites = sa.read_sites(tsv)
+        self.assertEqual(sites, [("MC", "mitfa", "chr5", 4, 10)])
+        d = Path(tempfile.mkdtemp())
+        with gzip.open(d / "g.fna.gz", "wt") as f:
+            f.write(">chr1\nAAAA\n>chr5 x\nACGTAC\nGTACGT\n")
+        self.assertEqual(sa.cut_sites(d / "g.fna.gz", sites), {sites[0]: "ACGTAC"})
+        hits = sa.parse_hits(["  300  4.0  0.0  0.0  site1  3  500  (0)  +  REX1-2_AFC  LINE/Rex-Babar  1  498  (10)  1"])
+        self.assertEqual(hits, [("site1", 3, 500, "REX1-2_AFC", "LINE/Rex-Babar", 96.0)])
 
 
 class MergedVersionLookup(unittest.TestCase):
