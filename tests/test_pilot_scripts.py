@@ -721,15 +721,19 @@ class GeneFilter(unittest.TestCase):
 
     def test_strong_and_weak_evidence_b(self):
         self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.45), "early endosome antigen 1", 0.30), "strong")
-        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "protein NLRC3", 0.30), "strong")
-        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "trace amine-associated receptor 13c", 0.30), "strong")
+        # coverage only (decided 2026-11-17): a small match to a gene-family protein is weak
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "protein NLRC3", 0.30), "weak")
         self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "early endosome antigen 1", 0.30), "weak")
+        # the earlier rule, behind --b-family-exception
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "protein NLRC3", 0.30, True), "strong")
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "trace amine-associated receptor 13c", 0.30, True), "strong")
+        self.assertEqual(gf.b_strength(("h", 1e-30, 300.0, 0.10), "early endosome antigen 1", 0.30, True), "weak")
 
     def test_a_report_from_an_earlier_rule_is_stale(self):
         import tempfile
         d = Path(tempfile.mkdtemp())
         (d / "old.tsv").write_text("family\tevidence_A\tevidence_B\n")
-        (d / "new.tsv").write_text("family\tevidence_A\tevidence_B\tevidence_B_strength\ttag_category\n")
+        (d / "new.tsv").write_text("family\tevidence_A\tevidence_B\tevidence_B_strength\ttag_category\tb_rule\n")
         self.assertTrue(gf.report_is_stale(d / "old.tsv"))
         self.assertFalse(gf.report_is_stale(d / "new.tsv"))
         self.assertFalse(gf.report_is_stale(d / "absent.tsv"))

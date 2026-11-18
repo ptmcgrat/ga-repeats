@@ -18,12 +18,14 @@ Evidence B, from blastx: the family's consensus matches a host protein (evalue <
   matches to RepeatPeps (evalue <= --host-te-evalue; domesticated transposon genes such as ZBED or NYNRIN)
   are left out. How much of each family the host match covers is recorded (repeats_019; the first version
   kept uncharacterized and transposon-derived host proteins and flagged real transposons).
-  Evidence B is strong when the host match covers at least --b-min-coverage of the family, or the host
-  gene belongs to a known multi-copy gene family (HOST_FAMILIES); otherwise weak, and weak B does not count.
+  Evidence B is strong when the host match covers at least --b-min-coverage of the family (decided 2026-11-17:
+  coverage only); otherwise weak, and weak B does not count. With --b-family-exception it is also strong when the
+  host gene belongs to a known multi-copy gene family (HOST_FAMILIES), whatever the coverage (the rule before
+  2026-11-17, which tagged transposon families carrying a small gene-like stretch).
 Decision (2026-11-13, refined 2026-11-14): flagged by A and strong B: tagged. Flagged by one: tagged unless
   repbase_match.py found Repbase transposon support. Weak B alone: not tagged, listed (a family that is mostly
   transposon with a small host-like stretch). Every flagged family is listed with its evidence. The report also
-  counts what the alternative rule (strong B by coverage only, without the gene-family exception) would tag.
+  counts what the other rule (with or without the gene-family exception) would tag.
 The report shows how much the tagged families mask: of the CDS of each annotated genome, and of --impact-genome
   (default DT_004f).
 
@@ -118,6 +120,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--b-ratio", type=float, default=2.0)
     parser.add_argument("--b-min-coverage", type=float, default=0.30,
                         help="host match coverage of the family for strong evidence B (default 0.30)")
+    parser.add_argument("--b-family-exception", action="store_true",
+                        help="also count evidence B as strong when the host gene is a known multi-copy gene family, "
+                             "whatever the coverage (the rule before 2026-11-17)")
     parser.add_argument("--impact-genome", default="DT_004f",
                         help="genome masked by --version on which to measure how much tagged families mask (default DT_004f)")
     parser.add_argument("--host-te-evalue", type=float, default=1e-5,
@@ -256,10 +261,11 @@ def evidence_b(host: Dict[str, tuple], te: Dict[str, tuple], evalue: float, rati
     return {q for q, h in host.items() if h[1] <= evalue and h[2] >= ratio * (te[q][2] if q in te else 0.0)}
 
 
-def b_strength(hit: tuple, product: str, min_coverage: float) -> str:
-    """'strong' if the host match covers enough of the family or the host gene is a known multi-copy family, else 'weak'."""
+def b_strength(hit: tuple, product: str, min_coverage: float, family_exception: bool = False) -> str:
+    """'strong' if the host match covers enough of the family (or, with the exception, the host gene is a known
+    multi-copy family), else 'weak'."""
     covered = hit[3] is not None and hit[3] >= min_coverage
-    return "strong" if covered or HOST_FAMILIES.search(product or "") else "weak"
+    return "strong" if covered or (family_exception and HOST_FAMILIES.search(product or "")) else "weak"
 
 
 def decide(in_a: bool, b: str, repbase_support: bool) -> Tuple[str, str]:
@@ -276,11 +282,11 @@ def decide(in_a: bool, b: str, repbase_support: bool) -> Tuple[str, str]:
 
 
 def report_is_stale(report: Path) -> bool:
-    """A report written by an earlier rule (without the tag_category column)."""
+    """A report written by an earlier rule (without the b_rule column)."""
     if not report.exists():
         return False
     with open(report) as handle:
-        return "tag_category" not in handle.readline().rstrip("\n").split("\t")
+        return "b_rule" not in handle.readline().rstrip("\n").split("\t")
 
 
 def read_tsv(path: Path) -> List[dict]:
@@ -388,20 +394,23 @@ def main(argv=None) -> None:
               "named_genes_masked", "evidence_B", "evidence_B_strength", "best_host_protein", "best_host_product",
               "host_bitscore", "host_match_coverage_of_family", "best_te_protein", "te_bitscore",
               "repbase_transposon_support", "repbase_entry", "repbase_label", "repbase_coverage",
-              "tag_category", "tagged_name", "decision", "reason"]
+              "tag_category", "tagged_name", "b_rule", "decision", "reason"]
     rows, tagged = [], []
-    tagged_alt = 0   # what the alternative rule (strong B by coverage only) would tag
+    tagged_alt = 0   # what the other rule (with or without the gene-family exception) would tag
+    rule_name = "coverage or gene family" if args.b_family_exception else "coverage only"
     for name, fam in families.items():
         ev_a = a.get(fam.family, {})   # gene tables name families without their #class suffix
         in_a = ev_a.get("flag", False)
         host_hit, te_hit = results["host"].get(short_of[name]), results["te"].get(short_of[name])
-        strength = b_strength(host_hit, products.get(host_hit[0], ""), args.b_min_coverage) if short_of[name] in b else ""
+        strength = (b_strength(host_hit, products.get(host_hit[0], ""), args.b_min_coverage, args.b_family_exception)
+                    if short_of[name] in b else "")
         if not (in_a or strength):
             continue
         rb = repbase.get(name, {})
         decision, reason = decide(in_a, strength, rb.get("transposon_support") == "yes")
-        covered = bool(strength) and host_hit[3] is not None and host_hit[3] >= args.b_min_coverage
-        alt, _ = decide(in_a, ("strong" if covered else "weak") if strength else "", rb.get("transposon_support") == "yes")
+        alt_strength = (b_strength(host_hit, products.get(host_hit[0], ""), args.b_min_coverage, not args.b_family_exception)
+                        if strength else "")
+        alt, _ = decide(in_a, alt_strength, rb.get("transposon_support") == "yes")
         tagged_alt += alt == "tag"
         product = products.get(host_hit[0], "") if host_hit else ""
         category = tag_category(product, strength, ev_a) if decision == "tag" else ""
@@ -418,6 +427,7 @@ def main(argv=None) -> None:
                      "repbase_transposon_support": rb.get("transposon_support", ""), "repbase_entry": rb.get("repbase_entry", ""),
                      "repbase_label": rb.get("repbase_label", ""), "repbase_coverage": rb.get("coverage_of_family", ""),
                      "tag_category": category, "tagged_name": tagged_name(fam.family, category, fam.label) if category else "",
+                     "b_rule": rule_name,
                      "decision": decision, "reason": reason})
         if decision == "tag":
             tagged.append(name)
@@ -436,7 +446,8 @@ def main(argv=None) -> None:
         print(f"  {reason}: {n}")
     print(f"tagged: {len(tagged)} families; by class: {', '.join(f'{k} {v}' for k, v in Counter(families[f].top_class for f in tagged).most_common())}")
     print("  by category: " + ", ".join(f"{k} {v}" for k, v in Counter(r["tag_category"] for r in rows if r["decision"] == "tag").most_common()))
-    print(f"  the alternative rule (strong B by coverage only, no gene-family exception) would tag {tagged_alt}")
+    print(f"  evidence B rule: {rule_name}; the other rule ({'coverage only' if args.b_family_exception else 'with the gene-family exception'}) "
+          f"would tag {tagged_alt}")
 
     # how much the tagged families mask
     bare = {families[f].family for f in tagged}
@@ -487,7 +498,7 @@ def main(argv=None) -> None:
               "host_set": "named proteins; uncharacterized and transposon products left out; RepeatPeps matches left out (blastp)",
               "host_families_pattern": HOST_FAMILIES.pattern, "rule": "A and strong B: tag; one line: tag unless Repbase transposon support; weak B alone: not tagged, listed",
               "tag_format": "<family>_hostgene-<CATEGORY>#<class>", "categories": [n for n, _ in CATEGORIES] + ["OTHER", "MULTI"],
-              "counts": {"families": len(families), "tagged": len(tagged), "tagged_by_alternative_rule": tagged_alt, "evidence_A": n_a,
+              "b_rule": rule_name, "counts": {"families": len(families), "tagged": len(tagged), "tagged_by_other_rule": tagged_alt, "evidence_A": n_a,
                          "evidence_B_strong": n_strong, "evidence_B_weak": n_weak, "both": both,
                          "by_reason": dict(Counter(r["reason"] for r in rows))},
               "written": f"{datetime.now():%Y-%m-%d %H:%M}",

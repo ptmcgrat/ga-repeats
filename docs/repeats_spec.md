@@ -2,7 +2,7 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.18, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2)
+**Document version:** 0.19, 2026-11-17 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2; 0.19: merge kept; tags by coverage only)
 **Owner:** McGrath lab
 **Status:** question 1 answered (one library per ecogroup); merge settings rehearsed (`RI_v4`, `RI_v5`); the concatenation test done (`RI_v8`); the question 2 verification panel being set up on `RI_v5`; **section 8 says where things stand**
 
@@ -230,8 +230,10 @@ naming a transposon protein, and proteins that blastp matches to RepeatPeps (dom
 ZBED or NYNRIN) are left out. How much of the family the host match covers is recorded. (The first report, with
 uncharacterized and transposon-derived host proteins kept, flagged 936 families by evidence B, most of them real
 transposons; nothing was written from it.) Evidence B counts only when it is strong: the host match covers at least 30%
-of the family, or the host gene belongs to a known multi-copy gene family (NLRs, TRIMs, immune, olfactory, taste and
-trace amine receptors, protocadherins, zinc fingers, histones, tubulins). A family with only weak evidence B (a small
+of the family (decided 2026-11-17: coverage only; until then it also counted when the host gene belonged to a known
+multi-copy gene family, whatever the coverage, which tagged 126 more families on matches covering a median 8% of them;
+that rule stays available as `--b-family-exception`). The known gene families (NLRs, TRIMs, immune, olfactory, taste and
+trace amine receptors, protocadherins, zinc fingers, histones, tubulins) still name the tag categories. A family with only weak evidence B (a small
 host-like stretch in what is otherwise a transposon) is kept and listed; cutting the stretch out of its consensus is a
 possible later step. Before any version is written, the report estimates what the removals cost: the masked coding
 sequence and the genome masking the removed families account for. Families flagged by both are tagged; families flagged by one are tagged unless a curated Repbase transposon covers at least half of them (decided 2026-11-17: tagged, not removed). A tagged family keeps its sequence and class and is renamed `<family>_hostgene-<CATEGORY>#<class>`, for example `MZ_MZ4f_rnd-1_family-163_hostgene-NLR#LTR/Gypsy`; CATEGORY is NLR, TRIM, IMMUNE, OR, TAAR, TASTE, PCDH, ZNF, HIST, TUB, OTHER (another named host gene) or MULTI (no protein match, but coding sequence in many named genes), from the best host protein, else from the gene family it mainly masks. Masking and class shares are unchanged by tagging, so they stay comparable with Quah et al., who kept such families in their library; any analysis can include or exclude tagged families. The thresholds are reviewed on the first report before any version is written.
@@ -383,6 +385,8 @@ has tried.
 | 2026-11-17 | Concatenation test `RI_v8`: `RI_v1`-`RI_v3` concatenated without clustering, DT_004f masked, compared with `RI_v5` | concatenation loses no family, but near-duplicates may split one family's copies, add label noise and fragment annotations, and masking takes longer; test before choosing; student |
 | 2026-11-17 | Question 2 verification panel: the known insertions (*rx1* and *mitfa* first; *tbx2a* and *fhl2b* once their genes are identified), lineage-specific loss on the build genomes, masking per chromosome with LG3, an approximate divergence landscape, curated-family recovery against Repbase's cichlid entries (Flynn et al. 2020's categories), the inconsistency measure, residual repeats on the final library, the same-genome comparison with Quah et al. | covers briefing C2 and adds the curated-family and lineage checks; the first five run on `RI_v5` now (`repeats_023`); student |
 | 2026-11-17 | How Repbase joins the final library (taxa, and precedence in clusters) is decided after the verification | the checks show where the de novo library is weak; student |
+| 2026-11-17 | The libraries are merged (section 4), not concatenated | the `RI_v8` test: concatenation gained 0.09 points of DT_004f but split one family's copies across several names in 980 of 1,150 multi-member clusters (about 164 Mb), with labels and fragmentation unchanged; student |
+| 2026-11-17 | Evidence B counts by coverage only: strong when the host match covers at least 30% of the family | with the gene-family exception, 126 more families were tagged on matches covering a median 8% of them, mostly LTR and LINE families, likely transposons carrying a gene-like stretch; a tag tells other projects "not a transposon"; student |
 
 ---
 
@@ -398,10 +402,8 @@ has tried.
 | `write_manifest.py` for merged versions (`RI_v4`, `RI_v5`, the final library): there is no RepeatModeler run; the manifest records the sources, the merge settings and the merge record | before merged versions are synced |
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
 | Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
-| Merge or concatenate the seven libraries? (the `RI_v8` test: concatenation gained 0.09 points of DT_004f but split one family's copies across names in 980 of 1,150 multi-member clusters, about 164 Mb; merge recommended) | before the final build |
 | Does the final masking add `-a` (alignments), for an exact (Kimura) divergence landscape? | before the final masking |
 | The host-gene tag in the shared `repeats` contract, and whether masked genomes used by other projects should include tagged families (through the coordinator) | before first integration |
-| Gene filter rule for tagging: keep the gene-family exception for evidence B, or count it by coverage only? (`RI_v7`'s report shows both) | no |
 | How much coding sequence may the final library mask? (no published threshold; per gene, about 4% of human genes carry transposon sequence in coding regions) | **yes, before the library is accepted** |
 | The earlier RepeatMasker annotation of LG2, LG10 and LG13 in seven annotated assemblies (an old RepeatMasker, a library from GT3a alone): another de novo library, so not an accuracy reference; worth a consistency comparison? | no |
 | Repbase merge (decided, section 6): which Repbase taxa are retained? The owner and the student decide | before the final masking |
@@ -470,12 +472,19 @@ unchanged (1,371 against 1,363 annotations per Mb); in 980 of `RI_v5`'s 1,150 mu
 hold 10% of the cluster's bases; run time 5:10 against 4:30. **Tagging report on `RI_v5`:** 304 families tagged by the
 rule with the gene-family exception, 178 by coverage only; tagged families mask 6.1-6.4% of coding sequence and 2.05% of DT_004f.
 
+**Divergence landscape, DT_004f, `RI_v5`** (approximate: mismatches, not Kimura; nested annotations each counted, so
+classes sum to 45.8% against 43.9% masked): DNA 16.0% of the genome (median divergence 5%), LINE 10.6% (4%), LTR 8.1% (4%),
+SINE 0.7% (8%), Unknown 8.8% (10%). About half of DNA, LINE and LTR bases lie within 5% of their consensus and 14-20% within
+1%; an older wave at 12-26% holds 34% of DNA and 25% of LINE and LTR bases. Unknown is skewed old (42% at 12-26%) and has a
+spike at 3-4% (1.54% of the genome, three to five times its neighbouring bins), to be traced to its families. SINEs have few
+young copies (8% within 1%).
+
 **Next** (`repeats_023`): the verification panel on `RI_v5`: `family_recovery.py` (165 cichlid Repbase entries: DNA 115,
 LINE 24, LTR 20, SINE 3, Satellite 3) and `divergence_landscape.py` now; `RI_v5` masks MZ_MZ4f and YH_YH2f (lineage-specific
 loss, `own_genome_loss.py`) and the five other annotated genomes (CV_CV1m, MC_MC1m, RC_006pf, YH_YH1m, AS_Sanger); then
 `known_insertions.py` on the eight annotated genomes and `chromosome_masking.py` on all eleven masked. Waiting: the inconsistency
 measure (EDTA's script to be read), residual repeats (final library), the same-genome comparison (fAstCal1.2, coordinator).
-Decisions waiting for the student: merge or concatenate; the tag rule. Nothing is ready to integrate.
+Then the tagging report on `RI_v5` by coverage only (`repeats_024`), and `RI_v6`. Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the
