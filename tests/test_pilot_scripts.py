@@ -31,6 +31,11 @@ import gene_overlap as go  # noqa: E402
 import repbase_match as rbm  # noqa: E402
 import gene_filter as gf  # noqa: E402
 import compare_concatenation as cc  # noqa: E402
+import known_insertions as ki  # noqa: E402
+import own_genome_loss as ogl  # noqa: E402
+import chromosome_masking as chm  # noqa: E402
+import divergence_landscape as dl  # noqa: E402
+import family_recovery as fr  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -454,6 +459,114 @@ class ConcatenationTest(unittest.TestCase):
         (folder / "run_record.json").write_text('{"started": "2026-11-17 10:05", "finished": "2026-11-17 14:35"}')
         self.assertEqual(cc.run_minutes(scratch, "RI_v8", "DT_004f"), 270)
         self.assertIsNone(cc.run_minutes(scratch, "RI_v5", "DT_004f"))
+
+
+class KnownInsertionsTest(unittest.TestCase):
+    GFF = [
+        "##gff-version 3",
+        "chr1\tRefSeq\tgene\t101\t600\t.\t+\t.\tID=gene-rx1;Name=rx1;gene=rx1",
+        "chr1\tRefSeq\tmRNA\t101\t600\t.\t+\t.\tID=rna-1;Parent=gene-rx1",
+        "chr1\tRefSeq\texon\t101\t200\t.\t+\t.\tParent=rna-1",
+        "chr1\tRefSeq\texon\t301\t400\t.\t+\t.\tParent=rna-1",
+        "chr1\tRefSeq\tCDS\t151\t200\t.\t+\t0\tParent=rna-1",
+        "chr1\tRefSeq\tCDS\t301\t350\t.\t+\t1\tParent=rna-1",
+        "chr2\tRefSeq\tgene\t500\t1100\t.\t-\t.\tID=gene-mitfa;Name=mitfa;gene=mitfa",
+        "chr2\tRefSeq\tmRNA\t500\t1100\t.\t-\t.\tID=rna-2;Parent=gene-mitfa",
+        "chr2\tRefSeq\texon\t1000\t1100\t.\t-\t.\tParent=rna-2",
+        "chr2\tRefSeq\texon\t800\t900\t.\t-\t.\tParent=rna-2",
+        "chr2\tRefSeq\texon\t500\t600\t.\t-\t.\tParent=rna-2",
+        "chr2\tRefSeq\tCDS\t800\t1050\t.\t-\t0\tParent=rna-2",
+        "chr2\tRefSeq\tgene\t5\t50\t.\t+\t.\tID=gene-other;Name=other",
+    ]
+
+    def test_gene_models_and_regions(self):
+        genes = {g["name"]: g for g in ki.read_gene_models(self.GFF, ki.GENES)}
+        self.assertEqual(set(genes), {"rx1", "mitfa"})
+        self.assertEqual(ki.intron1(genes["rx1"]["transcripts"]["rna-1"]["exons"], "+"), (200, 300))
+        self.assertEqual(ki.intron1(genes["mitfa"]["transcripts"]["rna-2"]["exons"], "-"), (900, 999))   # between the two highest exons
+        self.assertEqual(ki.regions(genes["rx1"], 100), [(50, 150)])                                   # 100 bp 5' of the CDS start (151)
+        self.assertEqual(ki.upstream(genes["mitfa"]["transcripts"]["rna-2"]["cds"], "-", 100), (1050, 1150))
+        self.assertEqual(ki.regions(genes["mitfa"], 100), [(900, 999)])
+
+    def test_annotations_are_clipped_to_the_region(self):
+        rows = [("chr2", 850, 950, "fA", "LINE/Rex-Babar"), ("chr2", 980, 1200, "fB", "DNA/hAT"), ("chr1", 900, 990, "fC", "LTR")]
+        self.assertEqual(ki.annotations_in(rows, "chr2", 900, 999),
+                         [(900, 950, "fA", "LINE/Rex-Babar"), (980, 999, "fB", "DNA/hAT")])
+
+
+class OwnGenomeLossTest(unittest.TestCase):
+    def test_lost_bases_per_family(self):
+        own = [("s", 0, 100, "fA", "LTR/Gypsy"), ("s", 200, 300, "fB", "DNA/hAT"), ("t", 0, 10, "fC", "Unknown")]
+        merged = [("s", 50, 250, "x", "LTR/Gypsy")]
+        lost = ogl.lost_by_family(own, merged)
+        self.assertEqual(dict(lost), {("fA", "LTR/Gypsy"): 50, ("fB", "DNA/hAT"): 50, ("fC", "Unknown"): 10})
+
+    def test_cluster_info(self):
+        import tempfile
+        table = Path(tempfile.mkdtemp()) / "cluster_table.tsv"
+        table.write_text("cluster\tfamily\trepresentative\tcluster_label\n"
+                         "0\tA_f1#LTR/Gypsy\tyes\tLTR/Gypsy\n0\tB_f7#LTR/Gypsy\tno\tLTR/Gypsy\n1\tC_f4#DNA\tyes\tDNA\n")
+        info = ogl.cluster_info(table)
+        self.assertEqual(info["B_f7"], {"cluster": "0", "role": "member", "size": 2, "representative": "A_f1", "cluster_label": "LTR/Gypsy"})
+        self.assertEqual(info["C_f4"]["role"], "representative")
+
+
+class ChromosomeMaskingTest(unittest.TestCase):
+    REPORT = [
+        '{"chrName": "3", "role": "assembled-molecule", "genbankAccession": "CM3.1", "refseqAccession": "NC_3.1", "length": 1000}',
+        '{"chrName": "13", "role": "assembled-molecule", "genbankAccession": "CM13.1", "refseqAccession": "NC_13.1", "length": 500}',
+        '{"chrName": "Un", "role": "unplaced-scaffold", "genbankAccession": "JA1.1", "length": 100}',
+    ]
+
+    def test_names_and_lg3(self):
+        genbank, refseq = chm.chromosome_names(self.REPORT)
+        self.assertEqual(genbank, {"CM3.1": ("3", 1000), "CM13.1": ("13", 500), "JA1.1": ("unplaced", 100)})
+        self.assertEqual(refseq, {"NC_3.1": ("3", 1000), "NC_13.1": ("13", 500)})
+        self.assertTrue(all(chm.LG3.match(x) for x in ("3", "LG3", "chr03")))
+        self.assertFalse(any(chm.LG3.match(x) for x in ("13", "LG13", "23")))
+
+    def test_per_chromosome(self):
+        genbank, _ = chm.chromosome_names(self.REPORT)
+        raw = [("CM3.1", 0, 100, "f", "LTR/Gypsy", 300), ("CM3.1", 50, 150, "g", "DNA/hAT", 200), ("JA1.1", 0, 10, "h", "Unknown", 50)]
+        stats = chm.per_chromosome(genbank, raw, [("CM3.1", 0, 100, "f", "LTR/Gypsy"), ("CM3.1", 100, 150, "g", "DNA/hAT"),
+                                                 ("JA1.1", 0, 10, "h", "Unknown")])
+        self.assertEqual((stats["3"]["length"], stats["3"]["masked"], stats["3"]["LTR"], stats["3"]["DNA"]), (1000, 150, 100, 50))
+        self.assertEqual((stats["unplaced"]["length"], stats["unplaced"]["masked"]), (100, 10))
+        self.assertEqual(stats["13"]["masked"], 0)
+
+
+class DivergenceLandscapeTest(unittest.TestCase):
+    def test_bins_and_median(self):
+        lines = ["#chrom\tstart\tend\tfamily\tscore\tstrand\tclass_family\tdivergence\tsw_score\trm_id",
+                 "s\t0\t100\tf\t0\t+\tLTR/Gypsy\t2.5\t300\t1",
+                 "s\t100\t130\tg\t0\t+\tLTR/Gypsy\t12.0\t200\t2",
+                 "s\t200\t210\t(CA)n\t0\t+\tSimple_repeat\t1.0\t20\t3",
+                 "s\t300\t400\th\t0\t+\tDNA/hAT\t70.0\t100\t4"]
+        land = dl.landscape(lines, 1.0, 50.0)
+        self.assertEqual(dict(land["LTR"]), {2.0: 100, 12.0: 30})
+        self.assertEqual(dict(land["DNA"]), {50.0: 100})     # everything from 50% on goes to the last bin
+        self.assertNotIn("Other", land)                       # simple repeats left out
+        self.assertEqual(dl.weighted_median(land["LTR"]), 2.0)
+
+
+class FamilyRecoveryTest(unittest.TestCase):
+    def test_parsing_both_strands(self):
+        lines = ["  500  2.0  0.0  0.0  q000001  1  980  (0)  +  CICH1  DNA/hAT  1  980  (20)  1",
+                 "  400  3.0  0.0  0.0  q000002  1  500  (0)  C  CICH1  DNA/hAT  (500)  500  1  2"]
+        self.assertEqual(fr.parse_hits(lines), [("q000001", "CICH1", 98.0, 1, 980), ("q000002", "CICH1", 97.0, 1, 500)])
+
+    def test_flynn_categories(self):
+        perfect = [("q1", "F", 98.0, 1, 980)]
+        good = [("q1", "F", 99.0, 1, 500), ("q2", "F", 99.0, 480, 1000)]
+        present = [("q1", "F", 85.0, 1, 900)]
+        absent = [("q1", "F", 99.0, 1, 600)]
+        self.assertEqual(fr.classify(perfect, 1000)["category"], "perfect")
+        self.assertEqual(fr.classify(good, 1000)["category"], "good")
+        self.assertEqual(fr.classify(present, 1000)["category"], "present")
+        self.assertEqual(fr.classify(absent, 1000)["category"], "not found")
+        self.assertEqual(fr.classify([], 1000)["category"], "not found")
+        best = fr.classify(good, 1000)
+        self.assertEqual((best["sequences_80"], round(best["coverage_95"], 3)), (2, 1.0))
 
 
 class MergedVersionLookup(unittest.TestCase):
