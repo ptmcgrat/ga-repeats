@@ -100,20 +100,30 @@ def panel_accession(assembly_id: str, panel: str = PANEL_VERSION) -> str:
     stop(f"{assembly_id} is not in {panel_file}")
 
 
+DERIVED_RECORDS = ("merge_record.json", "filter_record.json", "curation_record.json")
+
+
+def origin(name: str) -> str:
+    """Which RepeatModeler stage built a family: its LTR pipeline (ltr-1, or ltr_1 as TEtrimmer writes it) or
+    RepeatScout/RECON (rnd-N)."""
+    return "LTR pipeline" if re.search(r"_ltr[-_]1_", name) else "RepeatScout/RECON"
+
+
 def library_files(version: str) -> Tuple[str, Path, Path]:
     """(build assembly id, original families file, prefixed families file) of a version.
 
-    A merged version (merge_libraries.py) or a filtered one (gene_filter.py) has no single
-    build assembly: its library is <version>-families.prefixed.fa, its names already carry
-    their sources, and its library/ holds merge_record.json or filter_record.json. For it,
-    the build id is the version and the "original" file is that library itself.
+    A merged version (merge_libraries.py), a filtered one (gene_filter.py) or a curated one
+    (import_curated.py) has no single build assembly: its library is <version>-families.prefixed.fa,
+    its names already carry their sources, and its library/ holds merge_record.json,
+    filter_record.json or curation_record.json. For it, the build id is the version and the
+    "original" file is that library itself.
     """
     lib = version_folder(version) / "library"
     prefixed = sorted(lib.glob("*-families.prefixed.fa"))
     if len(prefixed) != 1:
         stop(f"expected one *-families.prefixed.fa in {lib}, found {len(prefixed)}")
     build_id = prefixed[0].name[: -len("-families.prefixed.fa")]
-    if build_id == version and ((lib / "merge_record.json").exists() or (lib / "filter_record.json").exists()):
+    if build_id == version and any((lib / f).exists() for f in DERIVED_RECORDS):
         return build_id, prefixed[0], prefixed[0]
     original = lib / f"{build_id}-families.fa"
     if not original.exists():

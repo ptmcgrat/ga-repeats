@@ -176,7 +176,7 @@ def main(argv=None) -> None:
             status[fam.family] = (kind, fam)
     fam_rows = []
     for name, (kind, fam) in sorted(status.items(), key=lambda kv: (ORDER[kv[1][0]], -footprint.get(kv[0], 0))):
-        origin = "LTR pipeline" if "_ltr-1_" in name else "RepeatScout/RECON"
+        origin = c.origin(name)
         others = sorted({r[5] for r in rows if r[0] == name})
         fam_rows.append([name, fam.label, fam.length, origin, kind, ",".join(others), footprint.get(name, 0)])
     out_dir.mkdir(parents=True, exist_ok=True)

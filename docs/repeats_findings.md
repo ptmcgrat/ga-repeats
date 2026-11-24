@@ -1,6 +1,6 @@
 # Repeats (project 1): established findings
 
-**Version 2, 2026-11-18** (B11 added; C1 broadened). A record of what our data show, kept for framing a paper. It is updated whenever a result
+**Version 3, 2026-11-19** (B5 checked independently; B12–B14 added; C2 resolved as B12; C5 added). A record of what our data show, kept for framing a paper. It is updated whenever a result
 becomes solid, and it is not the specification: decisions and open questions stay in `repeats_spec.md`.
 
 **What counts as established:** measured on our data, with a stated method, from recorded inputs that the repository's
@@ -117,18 +117,19 @@ al. 2020's categories:
 - **DNA transposons are recovered 92% of the time.**
 - **The missing include 6 LINE/L2 entries.**
 
-**B5. Published insertions are detected, but two of three are misclassified.** The probes are Carleton et al. 2020's
-Table S4 sequences; every one aligns end to end at 96–100% identity in all 11 genomes tested.
+**B5. Published insertions are detected, and an independent annotation confirms two misclassifications.** The probes
+are Carleton et al. 2020's Table S4 sequences; every one aligns end to end at 96–100% identity in all 11 genomes tested.
+Each inserted sequence was also annotated with all of Repbase, independently of our library.
 
-| locus | which genomes carry the insertion | our masking of it | published content |
+| locus | which genomes carry the insertion | Repbase annotation of the inserted sequence | our annotation |
 |---|---|---|---|
-| *mitfa* intron 1 | MC_MC1m only, exactly 1,408 bp between the flanks; none in the other 10, including the negative controls (two *M. zebra*, *A. calliptera*) | 1,388 bp (99%) masked, labelled **LTR** (Gypsy, Pao) | mainly Rex1 (LINE) |
-| *tbx2a* upstream | MZ_NMK2024a only; MZ_MZ4f, also *M. zebra*, lacks it | 1,088 bp masked, labelled **LTR/Gypsy** | hAT-8_AFC (DNA/hAT) |
+| *tbx2a* upstream | MZ_NMK2024a only; MZ_MZ4f, also *M. zebra*, lacks it | **hAT-8_AFC (DNA/hAT-Ac), 97% identity over 1,073 bp** (positions 114–1186 of the 1,332 bp probe), as published | the same stretch (114–1201) as **LTR/Gypsy**, by `MZ_MZ4f_ltr-1_family-769`, a composite LTR family (B14) |
+| *mitfa* intron 1 | MC_MC1m only, exactly 1,408 bp between the flanks; none in the other 10, including the negative controls (two *M. zebra*, *A. calliptera*) | **Rex1 (LINE/Rex-Babar) over 629–1177**: Rex1-1_PM (lamprey) at 81–84%, Rex1-6_OL (medaka) at 97% over 59 bp, as published; nothing elsewhere in the insertion | 629–1177 as **LTR/Pao** (`MZ_NMetZ_ltr-1_family-392`); 6–617 and 1179–1408 as LTR/Gypsy (`MZ_MZ4f_ltr-1_family-276`), where Repbase finds nothing |
 
-- **Both misclassifications come from LTR-pipeline families** (`ltr-1_` names).
-- **The library already has the right families:** a perfect match to hAT-8_AFC (`YH_YH2f_rnd-5_family-4640`, labelled
-  Unknown), and perfect matches to REX1-1 and REX1-2_AFC (labelled LINE/Rex-Babar).
-- **At *rx1*,** 10 of the 11 genomes carry the deletion, like *M. zebra*. AC_fAstCal68 is in section C.
+- **Detection is good:** 1,388 of the 1,408 *mitfa* bases and the whole hAT-8 stretch at *tbx2a* are masked.
+- **The library already has the right family for hAT-8_AFC:** a perfect match, `YH_YH2f_rnd-5_family-4640`, though
+  labelled Unknown. At *tbx2a*, RepeatMasker preferred the composite LTR family.
+- **At *rx1*,** 10 of the 11 genomes carry the deletion, like *M. zebra*; AC_fAstCal68 is B12.
 
 **B6. LG3 is the most-masked chromosome, and its length differences are repeat.** In all 11 assemblies, LG3 is masked
 63.5–70.5% over non-gap sequence, against 43.5–45.3% genome-wide. Its non-gap length varies from 64.0 to 86.2 Mb, but its
@@ -141,6 +142,8 @@ unmasked part stays at 22.9–26.6 Mb.
   chromosomes, often near one end.
 - **Per genome:** 12.6–20.2 Mb in the four genomes profiled.
 - **The landscape spike:** it produces 12.9 of the 15.4 Mb of Unknown at 3–4% divergence in DT_004f.
+- **Genome-wide:** of the 40.6 Mb of DT_004f that curated satellite entries mask, `RI_v5` labels 52.3% Unknown, 20.1 Mb of
+  it through this family (B13).
 
 **B8. The divergence landscape shows two waves of activity.** Approximate (mismatch-based) landscape of DT_004f:
 - **Recent wave:** about half of DNA, LINE and LTR bases lie within 5% of their consensus, and 14–20% within 1%.
@@ -168,6 +171,52 @@ cichlid families recovered (B4), the family of ours covering most of each one ha
 - **The satellite again:** the *O. niloticus* satellite ONSAT is matched best by `MZ_MZ4f_rnd-5_family-9801`, the
   satellite of B7.
 
+**B12. AC_fAstCal68 carries an insertion at *rx1*, containing Rex1-5_AFC.**
+- **Size:** 840 bp lie between the flanks: the 413 bp ancestral stretch plus about 427 bp.
+- **Repbase annotation:** Rex1-5_AFC (LINE/Rex-Babar) at 265–398 (90% identity) and 428–659 (98%). That is the element
+  Carleton et al. 2020 report in the long-palette species' *rx1* insertion.
+- **Our annotation:** LINE, with no subclass (`MZ_NMetZ_rnd-5_family-4263`), over 243–659, with an (AC)n between.
+- **The other 10 genomes carry the deletion.**
+- **Caveat:** Carleton et al. report *A. calliptera* as ancestral, so the state differs between individuals or
+  populations of *A. calliptera*. This rests on one assembly.
+
+**B13. Against the curated library, genome-wide, detection is near complete but classes often differ.** DT_004f was
+masked with the 165 curated cichlid entries alone, and compared base by base with `RI_v5`.
+- **The curated entries alone mask 23.17% of DT_004f:** DNA 10.99%, LINE 6.55%, satellites 4.08%, LTR 1.33%, SINE 0.22%.
+- **`RI_v5` masks 98.9–99.5% of those bases in every class.**
+
+| curated class | given the same class by `RI_v5` | given instead |
+|---|---|---|
+| DNA | 71.5% | Unknown 12.8%, LTR 9.5%, LINE 4.7% |
+| LINE | 79.2% | LTR 9.0%, Other 4.3%, Unknown 3.7% |
+| LTR | 81.5% | Unknown 7.3%, LINE 7.0%, DNA 4.1% |
+| SINE | 50.6% | LINE 15.1%, LTR 12.6%, DNA 11.5% |
+| satellites | 39.3% | Unknown 52.3% |
+
+- **The largest single source of disagreement is the satellite family of B7:** Unknown on 20.1 Mb of curated satellite.
+- **LTR-pipeline families give 22% of the curated bases that receive another class.**
+
+**B14. 65 families are composite: their consensus contains an element of another class.** A read-only check of every
+family against the curated cichlid entries, at 90% identity or more over at least 300 bp, found 243 families carrying
+another class's entry:
+
+| status | families | footprint on DT_004f | what it means |
+|---|---|---|---|
+| **composite** | **65** | 14.67 Mb (1.47%) | a near-complete element of another class inside |
+| relabel | 13 | 2.06 Mb | the family *is* that element; one of the 13 (874 kb) is only a naming difference, PLE against LINE/Penelope |
+| Unknown with class evidence | 78 | 11.08 Mb | 67 of them DNA |
+| partial | 87 | 16.83 Mb | listed only |
+
+- **The composites:** 35 come from the LTR pipeline and 30 from RepeatScout/RECON. Most are LTR or LINE families
+  containing DNA transposons.
+- **Their consensus sequences are implausibly long:** among the largest, a "SINE" of 11.4 kb and a "LINE/I" of 22.7 kb.
+- **Several are among the largest sources of disagreement in B13.**
+- **The positive controls:**
+  - The *tbx2a* family (769) is flagged for the hAT element its insertion carries, a genuine pass.
+  - The *mitfa* family 392 is flagged too, but for another hAT-Ac element. The Rex1 at that site matches Repbase only
+    distantly (81–84%), below the check's threshold.
+  - Family 276 carries no curated element, and none was found in its part of the insertion either.
+
 **B10. Gaps in assemblies matter for per-chromosome comparisons.** DT_004f is 2.98% gap, including 28.4 Mb (27%) of its
 LG3; the other assemblies are 0–1.8% gap. Three assemblies list the mitochondrion as a chromosome.
 
@@ -180,12 +229,13 @@ Each of these has a test planned or open, and none should be cited as a finding.
   outscore the dedicated families on those elements' copies and pass on their own label. B11 shows this would not be
   limited to the LTR pipeline. It fits the RepeatModeler2 paper's note that nested (mosaic) structures are not always
   resolved; RepeatModeler 2.0.9 offers no option capping the LTR internal length. The planned test is a composite-family
-  check over all families.
-- **C2. AC_fAstCal68 may carry the *rx1* insertion.** It has 840 bp between the flanks, insertion-sized, including a
-  344 bp LINE annotation. Carleton et al. report *A. calliptera* as ancestral, so this could be a population difference.
-  The planned test is an independent annotation of the site.
+  check over all families. B14 shows composites exist (65 families, 1.47% of DT_004f), and several are among the largest
+  sources of disagreement. How much of the disagreement in B13 they explain is still to be measured.
+- **C2.** Resolved: now B12.
 - **C3. Family 9801 may be SATA,** the centromeric satellite described in tilapias, whose monomer is 237 bp as far as I
   know. Its arrays' positions fit a centromeric satellite, but position alone doesn't prove it.
+- **C5. What the rest of MC's *mitfa* insertion is remains open.** About 840 bp lie outside its Rex1 stretch. Our
+  library labels them LTR/Gypsy (family 276), and Repbase finds nothing there.
 - **C4. The 4.7-point gap to Quah et al. 2025 is unexplained.** On *A. calliptera* we annotate 41.3% as transposons
   against their 36.6%. But the assembly differs (AC_fAstCal68 against fAstCal1.2), and so do the software and library.
   It needs a same-genome comparison.

@@ -41,6 +41,9 @@ import family_profile as fp  # noqa: E402
 import composite_families as cf  # noqa: E402
 import curated_annotation as ca  # noqa: E402
 import site_annotation as sa  # noqa: E402
+import curate_library as cur  # noqa: E402
+import import_curated as imc  # noqa: E402
+import compare_variants as cv  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -725,6 +728,94 @@ class MergedVersionLookup(unittest.TestCase):
         finally:
             c.version_folder = saved
         self.assertEqual((build_id, original, prefixed), ("RI_v4", lib / "RI_v4-families.prefixed.fa", lib / "RI_v4-families.prefixed.fa"))
+
+
+class CuratedVersionLookup(unittest.TestCase):
+    def test_an_imported_curated_version_uses_its_own_library(self):
+        import tempfile
+        root = Path(tempfile.mkdtemp())
+        lib = root / "RI_v10" / "library"
+        lib.mkdir(parents=True)
+        (lib / "RI_v10-families.prefixed.fa").write_text(">A1#LTR/Gypsy\nACGT\n")
+        (lib / "curation_record.json").write_text("{}")
+        saved = c.version_folder
+        c.version_folder = lambda version: root / version
+        try:
+            self.assertEqual(c.library_files("RI_v10"), ("RI_v10", lib / "RI_v10-families.prefixed.fa",
+                                                         lib / "RI_v10-families.prefixed.fa"))
+        finally:
+            c.version_folder = saved
+
+    def test_origin_reads_both_spellings(self):
+        self.assertEqual(c.origin("MZ_MZ4f_ltr-1_family-769"), "LTR pipeline")
+        self.assertEqual(c.origin("MZ_MZ4f_ltr_1_family_769_01"), "LTR pipeline")     # TEtrimmer's renaming
+        self.assertEqual(c.origin("MZ_MZ4f_rnd-5_family-9801"), "RepeatScout/RECON")
+
+
+class CurateLibraryTest(unittest.TestCase):
+    def fams(self):
+        out = []
+        for cls, n in (("DNA/hAT", 50), ("LINE/L2", 30), ("Unknown", 20)):
+            for i in range(n):
+                name = f"X_rnd-1_family-{cls[:3]}{i}"
+                out.append(c.Family(f"{name}#{cls}", name, cls, c.top_class(cls), 100))
+        return out
+
+    def test_stratified_sample_with_included_families(self):
+        from collections import Counter
+        fams = self.fams()
+        got = cur.stratified_sample(fams, 10, ["X_rnd-1_family-DNA7", "absent_family"], seed=1)
+        self.assertEqual(len(got), 10)
+        self.assertEqual(got[0].family, "X_rnd-1_family-DNA7")              # included families come first
+        rest = Counter(la.group(f.label) for f in got[1:])                   # 9 of 99: 4.5 / 2.7 / 1.8 -> 4 / 3 / 2
+        self.assertEqual((rest["DNA"], rest["LINE"], rest["Unknown"]), (4, 3, 2))
+        self.assertEqual([f.name for f in got], [f.name for f in cur.stratified_sample(fams, 10, ["X_rnd-1_family-DNA7"], 1)])
+        self.assertEqual(len({f.name for f in got}), 10)
+
+    def test_commands_use_the_tools_own_options(self):
+        import argparse
+        args = argparse.Namespace(tool="mchelper", conda="conda", env="repeat_family_merging_mchelper", threads=16,
+                                  mchelper_dir=Path("/t/MCHelper"), busco=Path("/t/b.hmm"), pfam_dir=Path("/t/pfam"))
+        cmd = cur.tool_command(args, Path("/w/input.fa"), Path("/w/g.fna"), Path("/w/out"), Path("/w"))
+        self.assertEqual(cmd[:8], ["nice", "-n", "10", "conda", "run", "-n", "repeat_family_merging_mchelper", "--no-capture-output"])
+        for pair in (["-r", "A"], ["-a", "F"], ["--te_aid", "N"], ["-t", "16"], ["--input_type", "fasta"], ["-b", "/t/b.hmm"]):
+            self.assertIn(pair, [cmd[i:i + 2] for i in range(len(cmd) - 1)])
+        args.tool, args.env = "tetrimmer", "repeat_family_merging_tetrimmer"
+        cmd = cur.tool_command(args, Path("/w/input.fa"), Path("/w/g.fna"), Path("/w/out"), Path("/w"))
+        self.assertIn("TEtrimmer", cmd)
+        self.assertIn("--classify_all", cmd)
+        for pair in (["-pd", "/t/pfam"], ["-t", "16"], ["-l", "/w/tetrimmer.log"], ["-o", "/w/out"]):
+            self.assertIn(pair, [cmd[i:i + 2] for i in range(len(cmd) - 1)])
+
+
+class ImportCuratedTest(unittest.TestCase):
+    def test_mchelper_labels_in_repeatmasker_form(self):
+        cases = {"CLASSI/LTR/GYPSY": "LTR/Gypsy", "CLASSI/LINE": "LINE", "CLASSI/LINE/JOCKEY": "LINE/I-Jockey",
+                 "CLASSII/TIR": "DNA", "CLASSII/TIR/P": "DNA/P", "CLASSII/TIR/TC1-MARINER": "DNA/TcMar",
+                 "CLASSII/HELITRON": "RC/Helitron", "CLASSI": "Unknown", "CLASSII": "Unknown",
+                 "CLASSI/XYZ/ABC": "Unknown", "Unclassified": "Unknown", "LTR/Gypsy": "LTR/Gypsy", "": "Unknown"}
+        for wicker, expected in cases.items():
+            self.assertEqual(imc.mchelper_label(wicker), expected, wicker)
+
+    def test_tetrimmer_headers_and_names(self):
+        lines = [">rnd_1_family_188#LTR/Gypsy\tTEtrimmer\tPerfect\n", "ACGT\n", "AC\n",
+                 ">rnd_1_family_188#DNA/hAT\tTEtrimmer\tGood\n", "GG\n", ">odd:name|x#Unknown\n", "T\n"]
+        records, rows = imc.convert(lines, "tetrimmer")
+        self.assertEqual(records, [("rnd_1_family_188", "LTR/Gypsy", "ACGTAC"), ("rnd_1_family_188_dup2", "DNA/hAT", "GG"),
+                                   ("odd_name_x", "Unknown", "T")])
+        self.assertEqual(rows[0], ["rnd_1_family_188", "LTR/Gypsy", "rnd_1_family_188", "LTR/Gypsy", "TEtrimmer Perfect", 6])
+
+    def test_mchelper_records(self):
+        records, rows = imc.convert([">MZ_rnd-1_family-56_inc#CLASSI/LINE\n", "AAA\n"], "mchelper")
+        self.assertEqual(records, [("MZ_rnd-1_family-56_inc", "LINE", "AAA")])
+        self.assertEqual(rows[0][2:5], ["MZ_rnd-1_family-56_inc", "CLASSI/LINE", "incomplete"])
+
+
+class CompareVariantsTest(unittest.TestCase):
+    def test_formatting(self):
+        self.assertEqual((cv.fmt(None), cv.fmt(12.3456), cv.fmt(7), cv.fmt("4/1/2/0")), ("-", "12.35", "7", "4/1/2/0"))
+        self.assertIsNone(cv.pct(3, 0))
+        self.assertAlmostEqual(cv.pct(1, 4), 25.0)
 
 
 class MergeEffect(unittest.TestCase):

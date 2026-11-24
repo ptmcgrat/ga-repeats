@@ -173,7 +173,7 @@ def main(argv=None) -> None:
     rows = [[cg, og, n] for (cg, og), n in sorted(table.items(), key=lambda kv: -kv[1])]
     fam_rows = []
     for (fam, label), by in sorted(wrong.items(), key=lambda kv: -sum(kv[1].values())):
-        fam_rows.append([fam, label, "LTR pipeline" if "_ltr-1_" in fam else "RepeatScout/RECON", sum(by.values()),
+        fam_rows.append([fam, label, c.origin(fam), sum(by.values()),
                          ";".join(f"{k} {v}" for k, v in by.most_common()), composite.get(fam, "not run" if not composite else "")])
     out_dir.mkdir(parents=True, exist_ok=True)
     c.write_tsv(targets[0], ["curated_class", "version_class", "bp"], rows)
