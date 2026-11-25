@@ -44,6 +44,9 @@ import site_annotation as sa  # noqa: E402
 import curate_library as cur  # noqa: E402
 import import_curated as imc  # noqa: E402
 import compare_variants as cv  # noqa: E402
+import fetch_reference as fref  # noqa: E402
+import te_composition as tc  # noqa: E402
+import curation_report as crep  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -816,6 +819,95 @@ class CompareVariantsTest(unittest.TestCase):
         self.assertEqual((cv.fmt(None), cv.fmt(12.3456), cv.fmt(7), cv.fmt("4/1/2/0")), ("-", "12.35", "7", "4/1/2/0"))
         self.assertIsNone(cv.pct(3, 0))
         self.assertAlmostEqual(cv.pct(1, 4), 25.0)
+
+
+class ReferenceGenomesTest(unittest.TestCase):
+    def test_registry_fallbacks_and_refusal(self):
+        import os
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        (d / "config").mkdir()
+        (d / "config" / "genome_panel_P1.tsv").write_text("panel_version\tid\taccession_genbank\nP1\tAC_fAstCal68\tGCA_964374335.1\n")
+        (d / "reference_genomes.tsv").write_text("id\tspecies\taccession\tassembly_name\tsource\tpurpose\tadded\n"
+                                                 "AC_fAstCal1_2\tA. calliptera\tGCF_900246225.1\tfAstCal1.2\tNCBI\tcomparison\t2026-11-23\n")
+        saved = (c.REFERENCES_FILE, os.environ.get("GA_CONFIG_DIR"), os.environ.get("GA_REPEATS_SCRATCH"))
+        c.REFERENCES_FILE = d / "reference_genomes.tsv"
+        os.environ["GA_CONFIG_DIR"], os.environ["GA_REPEATS_SCRATCH"] = str(d / "config"), str(d / "scratch")
+        try:
+            self.assertTrue(c.is_reference("AC_fAstCal1_2"))
+            self.assertFalse(c.is_reference("AC_fAstCal68"))
+            self.assertEqual(c.panel_accession("AC_fAstCal68"), "GCA_964374335.1")        # the panel first
+            self.assertEqual(c.panel_accession("AC_fAstCal1_2"), "GCF_900246225.1")       # then the references
+            self.assertEqual(c.genome_path("AC_fAstCal1_2", "GCF_900246225.1"),
+                             d / "scratch" / "references" / "AC_fAstCal1_2" / "genome.fna.gz")
+            with self.assertRaises(SystemExit):
+                c.panel_accession("XX_none")
+        finally:
+            c.REFERENCES_FILE = saved[0]
+            for key, value in (("GA_CONFIG_DIR", saved[1]), ("GA_REPEATS_SCRATCH", saved[2])):
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_ncbi_folder_and_checksums(self):
+        self.assertEqual(fref.folder_url("https://ftp.ncbi.nlm.nih.gov/genomes/all/", "GCF_900246225.1", "fAstCal1.2"),
+                         "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/900/246/225/GCF_900246225.1_fAstCal1.2/")
+        with self.assertRaises(ValueError):
+            fref.folder_url("x", "PRJEB80761", "y")
+        md5 = fref.parse_md5("abc123  ./GCF_1_x_genomic.fna.gz\ndef456  ./md5checksums.txt\n")
+        self.assertEqual(md5["GCF_1_x_genomic.fna.gz"], "abc123")
+
+
+class TeCompositionTest(unittest.TestCase):
+    def test_classes_as_repeatmasker_summarises_them(self):
+        cases = {"DNA/hAT-Ac": "DNA", "DNA?/hAT?": "DNA", "PLE/Penelope": "LINE", "LINE/L2": "LINE", "RC/Helitron": "RC",
+                 "Retroposon/L1-dep": "Retroposon", "Unknown": "Unknown", "Satellite": "Satellite",
+                 "Simple_repeat": "Simple_repeat", "Low_complexity": "Low_complexity", "tRNA": "small RNA",
+                 "rRNA": "small RNA", "ARTEFACT": "other"}
+        for label, expected in cases.items():
+            self.assertEqual(tc.category(label), expected, label)
+
+    def test_composition_counts_each_base_once(self):
+        rows = [("s", 0, 100, "f1", "DNA/hAT"), ("s", 100, 150, "f2_hostgene-NLR", "LTR/Gypsy"),
+                ("s", 150, 170, "(CA)n", "Simple_repeat"), ("s", 200, 260, "f3", "Unknown")]
+        got = tc.composition(rows)
+        self.assertEqual((got["TEs"], got["DNA"], got["LTR"], got["Unknown"], got["Simple_repeat"], got["gene-derived (tagged)"]),
+                         (210, 100, 50, 60, 20, 50))
+
+
+class CurationReportTest(unittest.TestCase):
+    def test_tracing_outputs_to_inputs(self):
+        inputs = {cur.normalize(n): n for n in ("MZ_MZ4f_ltr-1_family-20", "MZ_MZ4f_ltr-1_family-120",
+                                                "MZ_MZ4f_ltr-1_family-168", "MZ_MZ4f_rnd-5_family-9801")}
+        cases = {"MZ_MZ4f_ltr_1_family_20": "MZ_MZ4f_ltr-1_family-20",          # a family numbered 20, not a suffix
+                 "MZ_MZ4f_ltr_1_family_120_01": "MZ_MZ4f_ltr-1_family-120",     # TEtrimmer's subfamily
+                 "MZ_MZ4f_ltr-1_family-168_s_1_s_2": "MZ_MZ4f_ltr-1_family-168",  # MCHelper's split, twice
+                 "MZ_MZ4f_ltr-1_family-120_inc": "MZ_MZ4f_ltr-1_family-120",    # MCHelper's incomplete
+                 "MZ_MZ4f_rnd_5_family_9801": "MZ_MZ4f_rnd-5_family-9801", "MZ_MZ4f_ltr_1_family_99": None}
+        for out, expected in cases.items():
+            self.assertEqual(cur.source_family(out, inputs), expected, out)
+        self.assertEqual((cur.rm_class("mchelper", "CLASSII/HELITRON"), cur.rm_class("tetrimmer", "LTR/Gypsy")), ("RC", "LTR"))
+
+    def test_fates(self):
+        inputs = [("X_rnd-1_family-1", "LTR/Gypsy", "", "ACGT"), ("X_rnd-1_family-2", "Unknown", "", "AAAA"),
+                  ("X_rnd-1_family-3", "DNA/hAT", "", "CCCC"), ("X_rnd-1_family-4", "LINE/L2", "", "GGGG")]
+        outputs = [("X_rnd_1_family_1", "LTR/Gypsy", "TEtrimmer Perfect", "ACGT"),
+                   ("X_rnd_1_family_2", "DNA/hAT", "TEtrimmer Good", "AAAAAA"),
+                   ("X_rnd_1_family_3", "DNA/hAT", "TEtrimmer Good", "CC"), ("X_rnd_1_family_3_01", "LTR", "", "CCC")]
+        result, orphans = crep.fates("tetrimmer", inputs, outputs)
+        self.assertEqual([result[n]["fate"] for n in ("X_rnd-1_family-1", "X_rnd-1_family-2", "X_rnd-1_family-3", "X_rnd-1_family-4")],
+                         ["unchanged", "changed", "split", "absent"])
+        self.assertEqual(result["X_rnd-1_family-3"]["labels_after"], ["DNA/hAT", "LTR"])
+        self.assertEqual(orphans, [])
+        result, _ = crep.fates("mchelper", [("Y_ltr-1_family-9", "Unknown", "", "AC")], [("Y_ltr-1_family-9#x", "CLASSII/HELITRON", "", "AC")])
+        self.assertEqual(result["Y_ltr-1_family-9"]["labels_after"], ["RC/Helitron"])
+
+    def test_headers_with_and_without_evaluation(self):
+        import tempfile
+        p = Path(tempfile.mkdtemp()) / "lib.fa"
+        p.write_text(">A_1#LTR/Gypsy\tTEtrimmer\tGood\nacgt\nAC\n>B_2#Unknown\nTT\n")
+        self.assertEqual(crep.read_records(p), [("A_1", "LTR/Gypsy", "TEtrimmer Good", "ACGTAC"), ("B_2", "Unknown", "", "TT")])
 
 
 class MergeEffect(unittest.TestCase):

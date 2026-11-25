@@ -36,13 +36,7 @@ import _common as c  # noqa: E402
 import curate_library as cl  # noqa: E402
 import label_agreement as la  # noqa: E402
 
-ORDERS = {"LTR": "LTR", "LINE": "LINE", "SINE": "SINE", "DIRS": "LTR/DIRS", "PLE": "PLE", "TRIM": "LTR", "LARD": "LTR",
-          "TIR": "DNA", "MITE": "DNA", "HELITRON": "RC/Helitron", "MAVERICK": "DNA/Maverick", "CRYPTON": "DNA/Crypton"}
-SUPERFAMILIES = {"GYPSY": "Gypsy", "COPIA": "Copia", "BEL": "Pao", "BEL-PAO": "Pao", "PAO": "Pao", "ERV": "ERV",
-                 "JOCKEY": "I-Jockey", "L1": "L1", "L2": "L2", "RTE": "RTE", "I": "I", "R2": "R2", "CR1": "CR1",
-                 "TC1-MARINER": "TcMar", "HAT": "hAT", "MUTATOR": "MULE-MuDR", "MULE": "MULE-MuDR", "CACTA": "CMC-EnSpm",
-                 "PIF-HARBINGER": "PIF-Harbinger", "PIGGYBAC": "PiggyBac", "P": "P", "MERLIN": "Merlin",
-                 "TRANSIB": "Transib", "SOLA": "Sola", "PENELOPE": "Penelope"}
+ORDERS, SUPERFAMILIES = la.ORDERS, la.SUPERFAMILIES
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -54,20 +48,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def mchelper_label(label: str) -> str:
-    """MCHelper's Wicker label in RepeatMasker's form; anything not recognised becomes Unknown."""
-    text = label.strip()
-    if not text or text.lower() in ("unknown", "unclassified", "unclassified/unknown"):
-        return "Unknown"
-    parts = text.split("/")
-    if parts[0].upper() not in ("CLASSI", "CLASSII"):
-        return text
-    if len(parts) < 2 or parts[1].upper() not in ORDERS:
-        return "Unknown"
-    rm = ORDERS[parts[1].upper()]
-    if len(parts) >= 3 and parts[2] and "/" not in rm:
-        return f"{rm}/{SUPERFAMILIES.get(parts[2].upper(), parts[2].title())}"
-    return rm
+mchelper_label = la.wicker_label
 
 
 def parse_header(line: str) -> Tuple[str, str, str]:
@@ -163,7 +144,7 @@ def main(argv=None) -> None:
           f"labels mapped: {sum(mapping.values()):,}; renamed: {record['counts']['renamed']:,}")
     for k, v in mapping.most_common(8):
         print(f"  {v:>5}  {k}")
-    print(f"written: {target / 'library'}/\nnext: python scripts/mask_genomes.py --version {args.version} --assemblies DT_004f")
+    print(f"written: {target / 'library'}/\nnext: python scripts/mask_genomes.py --version {args.version} --assemblies AC_fAstCal1_2")
 
 
 if __name__ == "__main__":

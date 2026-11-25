@@ -9,8 +9,10 @@ Tool sources, databases and test runs are under `~/scratch/ga-repeats/tools` and
 | `repeat_family_merging_mchelper` | MCHelper 1.7.0, repository commit `cd808850183db5718222549c84e84378dab8e610` | its authors' exact `MCHelper.yml`: Python 3.8.16, BLAST 2.10.1, HMMER 3.3.2, CD-HIT 4.8.1, MAFFT 7.505, CIAlign 1.0.18 |
 | `repeat_family_merging_tetrimmer` | TEtrimmer 1.7.2 (bioconda) | Python 3.10.14, RepeatModeler 2.0.8, RepeatMasker 4.2.3, RMBlast 2.14.1 (`blastn` 2.14.1), Perl 5.32.1, `pfam_scan.pl` |
 
-The exported specifications (`conda env export`) are `~/scratch/ga-repeats/tools/repeat_family_merging_mchelper.yml`
-and `repeat_family_merging_tetrimmer.yml`; they are to be added to `envs/` in this repository.
+The exported specifications (`conda env export`, 2026-11-23) are in this repository:
+`envs/repeat_family_merging_mchelper.yml` and `envs/repeat_family_merging_tetrimmer.yml`. To rebuild an environment
+exactly: `conda env create -f envs/<file>`. The TEtrimmer environment also holds TEsorter 2.0.0 (a dependency of
+TEtrimmer), a classifier by transposon protein domains, should a classification step need it.
 
 ## Why two environments
 

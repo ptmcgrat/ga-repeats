@@ -1,0 +1,2 @@
+id	species	accession	assembly_name	source	purpose	added
+AC_fAstCal1_2	Astatotilapia calliptera	GCF_900246225.1	fAstCal1.2	NCBI RefSeq; Rhie et al. 2021; the assembly of Quah et al. 2025 (Genome Research) for their TE figures	comparison with published TE annotations of this assembly only; never used to build or curate a library, nor for alignment; kept in scratch, not in the shared genome store	2026-11-23

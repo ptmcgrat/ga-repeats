@@ -1,6 +1,6 @@
 # Repeats (project 1): established findings
 
-**Version 3, 2026-11-19** (B5 checked independently; B12–B14 added; C2 resolved as B12; C5 added). A record of what our data show, kept for framing a paper. It is updated whenever a result
+**Version 4, 2026-11-23** (C4: Quah et al.'s figures are for another assembly). Version 3, 2026-11-19: B5 checked independently; B12–B14 added; C2 resolved as B12; C5 added. A record of what our data show, kept for framing a paper. It is updated whenever a result
 becomes solid, and it is not the specification: decisions and open questions stay in `repeats_spec.md`.
 
 **What counts as established:** measured on our data, with a stated method, from recorded inputs that the repository's
@@ -236,6 +236,8 @@ Each of these has a test planned or open, and none should be cited as a finding.
   know. Its arrays' positions fit a centromeric satellite, but position alone doesn't prove it.
 - **C5. What the rest of MC's *mitfa* insertion is remains open.** About 840 bp lie outside its Rex1 stretch. Our
   library labels them LTR/Gypsy (family 276), and Repbase finds nothing there.
-- **C4. The 4.7-point gap to Quah et al. 2025 is unexplained.** On *A. calliptera* we annotate 41.3% as transposons
-  against their 36.6%. But the assembly differs (AC_fAstCal68 against fAstCal1.2), and so do the software and library.
-  It needs a same-genome comparison.
+- **C4. The 4.7-point gap to Quah et al. 2025 is unexplained, and partly an assembly difference.** On AC_fAstCal68 we
+  annotate 41.26% as transposons; Quah et al. report 36.55% for *A. calliptera*, but for fAstCal1.2 (GCF_900246225.1;
+  PacBio CLR, contig N50 4.4 Mb, 0.88 Gb), not for AC_fAstCal68 (GCA_964374335.1, contig N50 28.2 Mb). Their libraries
+  also included Repbase; ours do not yet. The planned test: our libraries on fAstCal1.2 itself, class by class against
+  their figures (DNA 12.09%, LINE 8.32%, LTR 7.38%, Unknown 8.54%).

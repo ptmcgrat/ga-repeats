@@ -2,7 +2,7 @@
 """Annotation against the curated cichlid library, genome-wide (question 2).
 
 The known insertions test three sites; this tests every copy of the curated families in a genome. It masks one genome
-(default DT_004f) with the curated cichlid Repbase entries alone (the Repbase entries of --species, default Cichlidae and
+(default AC_fAstCal1_2, fAstCal1.2: spec section 6, 2026-11-23) with the curated cichlid Repbase entries alone (the Repbase entries of --species, default Cichlidae and
 Oreochromis_niloticus: 165 entries, 70% DNA; taken from the classified Repbase repbase_match.py built), with the same
 RepeatMasker settings as our maskings (-engine rmblast -no_is), then compares base by base (one label per base: the
 highest-scoring annotation) with the version's masking:
@@ -17,8 +17,8 @@ The curated masking does not depend on the version: it is kept in <scratch>/cura
 reused when it is complete.
 
 Usage (from the repository root):
-  python scripts/curated_annotation.py --version RI_v5 --assembly DT_004f          # dry run
-  python scripts/curated_annotation.py --version RI_v5 --assembly DT_004f --go
+  python scripts/curated_annotation.py --version RI_v5 --assembly AC_fAstCal1_2          # dry run
+  python scripts/curated_annotation.py --version RI_v5 --assembly AC_fAstCal1_2 --go
 
 Writes, never overwriting, in <scratch>/comparisons/curated_annotation/: <version>_<tag>_<assembly>_classes.tsv
 (curated class by the version's class, in bases) and <version>_<tag>_<assembly>_families.tsv (the version's families on
@@ -41,7 +41,8 @@ import label_agreement as la  # noqa: E402
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", required=True, help="the version to compare, e.g. RI_v5")
-    parser.add_argument("--assembly", default="DT_004f", help="a genome the version has masked (default DT_004f)")
+    parser.add_argument("--assembly", default="AC_fAstCal1_2",
+                        help="a genome the version has masked (default AC_fAstCal1_2, fAstCal1.2)")
     parser.add_argument("--species", nargs="+", default=["Cichlidae", "Oreochromis_niloticus"])
     parser.add_argument("--tag", default="cichlid")
     parser.add_argument("--release", default="20181026")

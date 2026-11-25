@@ -40,7 +40,8 @@ CURATED = ["DNA", "LINE", "LTR", "SINE", "Other"]
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--versions", nargs="+", required=True)
-    parser.add_argument("--assembly", default="DT_004f")
+    parser.add_argument("--assembly", default="AC_fAstCal1_2",
+                        help="genome all variants are masked on (default fAstCal1.2, spec section 6, 2026-11-23)")
     parser.add_argument("--tag", default="cichlid", help="the curated set (family_recovery.py, curated_annotation.py)")
     c.add_common_args(parser)
     return parser.parse_args(argv)

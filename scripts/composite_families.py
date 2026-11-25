@@ -18,7 +18,7 @@ as groups (DNA, LINE, LTR, SINE, Unknown, Other). A family is
   partial    another class's match passing identity and length but neither threshold: listed, not flagged.
 The positive controls (--controls; default the families at the published mitfa and tbx2a insertions) must come out
 composite or relabel; the printout says whether they do. Each family's footprint is the bases it masks in --genome
-(default DT_004f; one label per base).
+(default AC_fAstCal1_2, fAstCal1.2; one label per base).
 
 Usage (from the repository root):
   python scripts/composite_families.py --version RI_v5          # dry run
@@ -51,7 +51,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--min-length", type=int, default=300)
     parser.add_argument("--min-entry", type=float, default=0.8)
     parser.add_argument("--min-family", type=float, default=0.8)
-    parser.add_argument("--genome", default="DT_004f", help="genome masked by the version, for footprints (default DT_004f)")
+    parser.add_argument("--genome", default="AC_fAstCal1_2",
+                        help="genome masked by the version, for footprints (default AC_fAstCal1_2, fAstCal1.2)")
     parser.add_argument("--controls", nargs="*", default=CONTROLS, help="families that must be flagged")
     parser.add_argument("--release", default="20181026")
     c.add_common_args(parser)

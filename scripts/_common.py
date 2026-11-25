@@ -69,7 +69,29 @@ def _paths():
     return Paths.load()
 
 
+REFERENCES_FILE = Path(__file__).resolve().parent.parent / "references" / "reference_genomes.tsv"
+
+
+def reference_genomes() -> Dict[str, Dict[str, str]]:
+    """Reference genomes (spec section 6, 2026-11-23): published assemblies kept in scratch only, used only to compare
+    our libraries with published annotations of the same assembly; never to build or curate a library, nor for alignment."""
+    if not REFERENCES_FILE.exists():
+        return {}
+    with open(REFERENCES_FILE, newline="") as handle:
+        return {r["id"]: r for r in csv.DictReader(handle, delimiter="\t") if r.get("id")}
+
+
+def is_reference(assembly_id: str) -> bool:
+    return assembly_id in reference_genomes()
+
+
+def reference_folder(assembly_id: str) -> Path:
+    return Path(os.environ.get("GA_REPEATS_SCRATCH", str(DEFAULT_SCRATCH))) / "references" / assembly_id
+
+
 def genome_path(assembly_id: str, accession_version: str) -> Path:
+    if is_reference(assembly_id):
+        return reference_folder(assembly_id) / "genome.fna.gz"
     return Path(str(_paths().local("genome_fasta", assembly_id=assembly_id,
                                    accession_version=accession_version)))
 
@@ -97,7 +119,10 @@ def panel_accession(assembly_id: str, panel: str = PANEL_VERSION) -> str:
         for row in csv.DictReader(handle, delimiter="\t"):
             if row.get("id") == assembly_id:
                 return row["accession_genbank"]
-    stop(f"{assembly_id} is not in {panel_file}")
+    references = reference_genomes()
+    if assembly_id in references:
+        return references[assembly_id]["accession"]
+    stop(f"{assembly_id} is not in {panel_file} nor in {REFERENCES_FILE}")
 
 
 DERIVED_RECORDS = ("merge_record.json", "filter_record.json", "curation_record.json")
@@ -285,7 +310,7 @@ class Hit(NamedTuple):
 
 
 def parse_out(path: Path) -> Iterator[Hit]:
-    with open(path) as handle:
+    with open_text(path) as handle:
         for line in handle:
             fields = line.split()
             if len(fields) < 15 or not fields[0].isdigit():

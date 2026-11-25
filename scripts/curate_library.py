@@ -29,13 +29,14 @@ import argparse
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _common as c  # noqa: E402
@@ -90,6 +91,35 @@ def stratified_sample(families: Sequence[c.Family], n: int, include: Sequence[st
     return chosen
 
 
+SUFFIXES = (r"_inc$", r"_s_\d+$", r"_\d{2}$")     # MCHelper: incomplete, split subfamily; TEtrimmer: subfamily _01
+
+
+def normalize(name: str) -> str:
+    """Family name before '#', with hyphens as underscores (TEtrimmer writes rnd-1_family-1 as rnd_1_family_1)."""
+    return name.split("#", 1)[0].replace("-", "_")
+
+
+def source_family(name: str, inputs: Dict[str, str]) -> Optional[str]:
+    """The input family an output family derives from: an exact match first, then with the tools' suffixes removed one
+    at a time (so a family numbered _20 is never mistaken for TEtrimmer's subfamily suffix)."""
+    current = normalize(name)
+    while True:
+        if current in inputs:
+            return inputs[current]
+        for pattern in SUFFIXES:
+            stripped = re.sub(pattern, "", current)
+            if stripped != current:
+                current = stripped
+                break
+        else:
+            return None
+
+
+def rm_class(tool: str, label: str) -> str:
+    """An output label as a RepeatMasker class (MCHelper's Wicker labels mapped)."""
+    return c.top_class(la.wicker_label(label) if tool == "mchelper" else label)
+
+
 def tool_command(args, input_fa: Path, genome: Path, out: Path, work: Path) -> List[str]:
     base = ["nice", "-n", "10", args.conda, "run", "-n", args.env, "--no-capture-output"]
     if args.tool == "mchelper":
@@ -125,6 +155,9 @@ def main(argv=None) -> None:
     assembly = args.assembly or (None if build == args.version else build)
     if not assembly:
         c.stop(f"{args.version} is a merged or derived version: give the genome to curate against with --assembly")
+    if c.is_reference(assembly):
+        c.stop(f"{assembly} is a reference genome: kept for comparisons only, never used to build or curate a library "
+               f"(spec section 6, 2026-11-23)")
     genome = c.genome_path(assembly, c.panel_accession(assembly))
     needs = [args.mchelper_dir / "MCHelper.py", args.busco] if args.tool == "mchelper" else [args.pfam_dir]
     for f in needs + [genome]:
@@ -174,11 +207,16 @@ def main(argv=None) -> None:
     if not result.exists():
         c.stop(f"{args.tool} finished but wrote no {result}; see {work / 'tool.log'}")
     out_families = c.read_families(result)
-    labels = Counter(f.top_class for f in out_families)
+    labels = Counter(rm_class(args.tool, f.label) for f in out_families)
+    inputs = {normalize(f.family): f.family for f in chosen}
+    sources = Counter(source_family(f.family, inputs) for f in out_families)
+    represented = {k for k in sources if k}
     record = {"tool": args.tool, "tool_version": version_text, "environment": args.env, "version": args.version,
               "assembly": assembly, "pilot": args.pilot, "seed": args.seed if args.pilot else None,
               "included": sorted(f.family for f in chosen if f.family in set(args.include)) if args.pilot else [],
               "families_in": len(chosen), "families_out": len(out_families), "labels_out": dict(labels.most_common()),
+              "inputs_represented": len(represented), "inputs_split": sum(1 for k, v in sources.items() if k and v > 1),
+              "inputs_absent": len(chosen) - len(represented), "outputs_without_source": sources.get(None, 0),
               "command": c.shell_text(command), "threads": args.threads, "output": str(OUTPUT[args.tool]),
               "started": f"{started:%Y-%m-%d %H:%M:%S}", "finished": f"{datetime.now():%Y-%m-%d %H:%M:%S}",
               "hours": round(hours, 2),
@@ -187,7 +225,9 @@ def main(argv=None) -> None:
         json.dump(record, handle, indent=2)
         handle.write("\n")
     print(f"\n{args.tool}: {len(chosen):,} families in, {len(out_families):,} out in {hours:.2f} h "
-          f"({', '.join(f'{k} {v}' for k, v in labels.most_common(8))})")
+          f"({', '.join(f'{k} {v}' for k, v in labels.most_common(8))}); inputs kept {len(represented):,} "
+          f"(split {record['inputs_split']:,}), absent {record['inputs_absent']:,}")
+    print(f"per family: python scripts/curation_report.py --from {work} --go")
     print(f"library: {result}\nrecord:  {work / 'record.json'}")
     if not args.pilot:
         print(f"next: python scripts/import_curated.py --from {work} --version <new version>")

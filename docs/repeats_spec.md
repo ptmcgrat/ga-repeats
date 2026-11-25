@@ -2,9 +2,9 @@
 
 **Project:** 1, Repeats
 **Repository:** `ga-repeats` (https://github.com/ptmcgrat/ga-repeats)
-**Document version:** 0.22, 2026-11-23 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2; 0.19: merge kept; tags by coverage only; 0.20: the first verification results; the known insertions anchored on published sequence; 0.21: label checks against the curated library; the findings document; 0.22: existing curation tools installed for comparison)
+**Document version:** 0.24, 2026-11-24 (0.1: first draft from coordinator specification v0.4; 0.2: delivery text from v0.5; 0.3: relatedness context from v0.7; 0.4: the P1 genomes are downloaded, from v0.8; 0.5: the first conversation starts at the briefing; working with a student; 0.6: uploading wording corrected; 0.7: the student uploads the PDFs; 0.8: using the common library; 0.9: first conversation done; the owner's decisions on the question 1 pilot, the tools and Repbase; prior-art versions corrected; 0.10: masked genomes are not stored (coordinator answer); Repbase licence and location are not a concern; runtime and `ga_common` in the `ga-repeats` environment; first pilot run started; 0.11: the three pilot libraries built; comparisons, masking and manifests scripted (`repeats_009`); Dfam 4.0 classification reference; the student pushes from the laptop; 0.12: the pilot's results and question 1's answer (one library per ecogroup); the merge rehearsals `RI_v4` and `RI_v5` and the merge settings; the owner's delegation; accuracy checks begun; 0.13: the coding-sequence check's result, the gene filter, Repbase in place with its metadata; 0.14: the gene filter's host proteins cleaned after its first report; the Repbase label check; 0.15: the gene filter's evidence refined after its second report; 0.16: gene-derived families tagged, not removed; panEDTA's copy-number filter and inconsistency measure adopted; the `RI_v7` rehearsal; 0.17: the copy-number filter set aside for now; the concatenation test; 0.18: the verification panel for question 2; 0.19: merge kept; tags by coverage only; 0.20: the first verification results; the known insertions anchored on published sequence; 0.21: label checks against the curated library; the findings document; 0.22: existing curation tools installed for comparison; 0.23: every evaluation against published data, like for like; the reference genome fAstCal1.2; 0.24: the curation pilots)
 **Owner:** McGrath lab
-**Status:** question 1 answered; merge settings decided; `RI_v6` written (178 families tagged); the question 2 checks found class labels to be the main problem; existing curation tools (MCHelper, TEtrimmer) installed and smoke-tested, their comparison next; established findings in `docs/repeats_findings.md`; **section 8 says where things stand**
+**Status:** question 1 answered; merge settings decided; `RI_v6` written (178 families tagged); the question 2 checks found class labels to be the main problem; curation tools (MCHelper, TEtrimmer) installed and piloted on 100 families; from now on every evaluation is against published data, like for like, and comparisons with Quah et al. 2025 use their assembly fAstCal1.2; established findings in `docs/repeats_findings.md`; **section 8 says where things stand**
 
 This is the single specification document of project 1. It is always replaced whole.
 It records what the coordinator specification already fixes, and leaves everything
@@ -325,6 +325,14 @@ has tried.
 
 ## 5. Checks (proposed; to be agreed)
 
+**The principle for every evaluation** (decided 2026-11-23, section 6): every evaluation uses published, independent data
+as its reference, compared like for like (the same assembly, the same definitions); our own libraries are only ever what
+is evaluated, never the reference. Published references differ in strength: those resting on independent evidence (the
+insertions of Carleton et al. 2020, confirmed by sequencing; Repbase's curated cichlid families) weigh more than the
+output of another annotation pipeline (the percentages of Quah et al. 2025), which shows consistency with a published
+method rather than correctness. Exception: controls whose truth is known by construction (a shuffled chromosome, where
+any masking is spurious).
+
 - every output validates against the `repeats` contract version (once defined);
 - every assembly in the masked set has output, and sequence names and lengths in the output
   match the assembly's `provenance.json`;
@@ -391,6 +399,8 @@ has tried.
 | 2026-11-18 | `-LTRStruct` stays (decided 2026-10-28); mislabelled or composite consensus sequences are dealt with after RepeatModeler | the mislabelling is not specific to the LTR pipeline (findings B11: 42 of 54 disagreements come from RepeatScout/RECON families), and RepeatModeler 2.0.9 offers no option capping the LTR internal length (its LTR options are `-LTRStruct` and `-ltr_retriever_dir`); student |
 | 2026-11-19 | Existing tools come before our own rules: the curation tools MCHelper (Orozco-Arias et al. 2024) and TEtrimmer (Qian et al. 2025) are run on a source library and compared, with the checks of question 2, against the raw library and later against rule-based label correction | the label problem (findings B13, B14) concerns every family, so a fix must be systematic; published, benchmarked tools first; student |
 | 2026-11-20 to 2026-11-23 | The curation tools run in their own conda environments, called from `ga-repeats` through `conda run`; `ga-repeats` is unchanged: `repeat_family_merging_mchelper` (MCHelper 1.7.0, commit cd80885, its authors' exact environment `MCHelper.yml`: Python 3.8.16, BLAST 2.10.1, HMMER 3.3.2) and `repeat_family_merging_tetrimmer` (TEtrimmer 1.7.2 from bioconda: Python 3.10.14, RepeatModeler 2.0.8, RepeatMasker 4.2.3, RMBlast 2.14.1, Perl 5.32.1). Tool sources, databases and test runs are under `<scratch>/tools` and `<scratch>/tool_tests` | one environment cannot be solved: TEtrimmer's `pfam_scan` needs zlib below 1.3, RMBlast 2.17 (needed by RepeatMasker 4.2.4 and RepeatModeler 2.0.9) needs zlib 1.3.2 or later, and an unconstrained solve fell back to RepeatModeler 1.0.8 with a Perl that does not run on mzebra; how they were built: `docs/tool_environments.md`; student |
+| 2026-11-23 | Every evaluation uses published, independent data as its reference, compared like for like (the same assembly, the same definitions); our libraries are only ever what is evaluated. Exception: controls whose truth is known by construction | the masked shares of our libraries (40.3-43.9% of DT_004f) are above every published figure for Lake Malawi cichlids (35-37% from long-read assemblies, Conte et al. 2019; 36.32-38.29%, Quah et al. 2025), and only comparisons with published data can say whether that is an excess or an error; student |
+| 2026-11-23 | Comparisons with Quah et al. 2025 use their assembly, *A. calliptera* fAstCal1.2 (GCF_900246225.1), not AC_fAstCal68 (GCA_964374335.1, a different, more contiguous assembly): it is a reference genome, downloaded into `<scratch>/references/AC_fAstCal1_2/` only, listed in `references/reference_genomes.tsv`, used only for comparisons with published TE annotations of it, never to build or curate a library nor for alignment, and not added to the shared genome store (no request to the coordinator). Comparisons of library variants are masked on it from now on; results on DT_004f stay as recorded | Quah et al.'s TE figures (36.55%: DNA 12.09%, LINE 8.32%, LTR 7.38%, Unknown 8.54%, SINE, helitrons and retroposons <1% together) are for fAstCal1.2, so a comparison on another assembly mixes assembly and library; student |
 
 ---
 
@@ -407,6 +417,8 @@ has tried.
 | Push `RI_v1`–`RI_v3` (and the rehearsal versions) to Dropbox as records? | no |
 | Where is *tbx2a* in the annotated genomes? NCBI names only *tbx2b*; a gene described as TBX3 on chromosome 10 may be it (needed for the known insertions) | no |
 | Does the final masking add `-a` (alignments), for an exact (Kimura) divergence landscape? | before the final masking |
+| How to choose a curation tool: proposed is to judge by agreement with the curated library, composites, Unknown share and run time, and, instead of a limit on lost coverage, to require that the bases the curated library masks (known TE copies) stay masked within 0.5 points, with any other lost coverage broken down (in coding sequence, in the shuffled control, elsewhere); the student asked to reconsider coverage limits because our masked shares exceed published ones | after the comparison with Quah et al. on fAstCal1.2 |
+| The shuffled-chromosome control (allowed by the principle as an exception): which chromosome, and how it is shuffled (preserving dinucleotide composition) | next package |
 | The settings of the tool comparison: proposed in `repeats_027` are MCHelper `-r A -a F` with its defaults and TE-Aid off (its plots serve manual inspection only), BUSCO set `actinopterygii_odb10.2020-08-05` (the release of its authors' own test set; `odb12` sets exist), TEtrimmer `--classify_all` with its defaults | after the pilot |
 | Whether to give TEtrimmer the curated Repbase entries through its `--curatedlib` (it drops input families more than 95% identical to them) | with the Repbase decision |
 | How to correct mislabelled and composite consensus sequences (relabel from curated matches, trim the other element, or correct labels after masking), once the composite check and the comparison against the curated library have measured the problem | before the final build |
@@ -522,12 +534,31 @@ on 8 threads; its repository holds expected results only for its full test input
 with them (its clustering and subfamily splitting depend on the whole library); a run of the full fruit-fly input is an
 optional check.
 
-**Next** (`repeats_027`): `curate_library.py` (either tool on a version's library and build genome, through
-`conda run`; `--pilot N` for a class-stratified sample that always includes the composite families at the published
-insertions and the satellite family), `import_curated.py` (a tool's library as a version, MCHelper's Wicker labels in
-RepeatMasker's form), `compare_variants.py` (one table across versions from the checks' outputs). First the pilot (100
-families of `RI_v1` on MZ_MZ4f, both tools), then full `RI_v1`, import, masking of DT_004f, the checks, and the comparison
-with raw `RI_v1`. Nothing is ready to integrate.
+**Comparison with published data** (2026-11-23; decisions in section 6): Quah et al. 2025 report TEs for *A. calliptera*
+fAstCal1.2 (GCF_900246225.1; PacBio CLR with Illumina, contig N50 4.4 Mb, 0.88 Gb): 36.55%, of which DNA 12.09%, LINE
+8.32%, LTR 7.38%, Unknown 8.54%, SINEs, helitrons and retroposons together under 1%; their libraries were RepeatModeler
+2.0.3 (`-LTRStruct`) libraries combined with Repbase's RepeatMasker libraries, masked with RepeatMasker 4.1.2-p1 (`-e
+rmblast -no_is`). Our AC_fAstCal68 (GCA_964374335.1, Wellcome Sanger 2024, contig N50 28.2 Mb) is a different assembly,
+so the 4.7-point gap of findings C4 mixes assembly and library. Our libraries do not yet contain Repbase, which theirs did.
+
+**Curation pilots** (2026-11-23 to 2026-11-24; 100 families of `RI_v1` on MZ_MZ4f, 16 threads; a class-stratified
+sample, seed 1, always including families 276, 769 and 9801). TEtrimmer 1.7.2: 77 families out in 9.70 h (LTR 38, DNA 18,
+LINE 12, Unknown 8, Retroposon 1). MCHelper 1.7.0: 97 out in 2.64 h, every one classified (Wicker class I 61, class II 36).
+At this rate the full `RI_v1` (2,396 families) would take TEtrimmer about 232 h on 16 threads and MCHelper about 63 h.
+Of the 23 Unknown families going in, TEtrimmer left 8 Unknown and MCHelper none: MCHelper does not remove families it
+cannot classify (as its toy run had suggested) but assigns them a class, and it called the satellite family 9801 a
+Helitron (`CLASSII/HELITRON`), against the evidence of findings B7 (237 bp tandem period; best Repbase matches TZSAT and
+ONSAT, both satellites); TEtrimmer kept 9801 as Unknown. Neither tool relabelled the *tbx2a* composite 769: TEtrimmer split
+it into three subfamilies, all LTR/Gypsy; MCHelper kept it as LTR/Gypsy, marked incomplete. Family 276 stayed LTR/Gypsy
+in both. MCHelper relabelled some LTR-pipeline families as DNA transposons (family 168 became four `CLASSII/TIR`
+subfamilies); whether that is right needs evidence. These are pilot observations, not findings.
+
+**Next** (`repeats_028`): `curation_report.py` on both pilots (what each tool did to each family: unchanged, changed,
+split or absent; class before and after; TEtrimmer's evaluations); then the full runs on `RI_v1`, with more threads.
+`fetch_reference.py` (fAstCal1.2 from NCBI into scratch, checked against NCBI's checksums, with NCBI's own RepeatMasker
+run where provided), `mask_genomes.py --version RI_v5 --assemblies AC_fAstCal1_2`, `te_composition.py` (our classes
+beside NCBI's run and Quah et al.'s figures). The comparison scripts (`compare_variants.py`, `curated_annotation.py`,
+`composite_families.py`) now default to fAstCal1.2. Nothing is ready to integrate.
 
 **Gate log** (section 4a, item 5):
 - Gate 0, 2026-10-28: all five answered. Q2's definitions and Q3 were right first time; Q5 needed one pointer and the
