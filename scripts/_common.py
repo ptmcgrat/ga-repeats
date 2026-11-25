@@ -125,7 +125,7 @@ def panel_accession(assembly_id: str, panel: str = PANEL_VERSION) -> str:
     stop(f"{assembly_id} is not in {panel_file} nor in {REFERENCES_FILE}")
 
 
-DERIVED_RECORDS = ("merge_record.json", "filter_record.json", "curation_record.json")
+DERIVED_RECORDS = ("merge_record.json", "filter_record.json", "curation_record.json", "combine_record.json")
 
 
 def origin(name: str) -> str:
@@ -137,10 +137,10 @@ def origin(name: str) -> str:
 def library_files(version: str) -> Tuple[str, Path, Path]:
     """(build assembly id, original families file, prefixed families file) of a version.
 
-    A merged version (merge_libraries.py), a filtered one (gene_filter.py) or a curated one
-    (import_curated.py) has no single build assembly: its library is <version>-families.prefixed.fa,
+    A merged version (merge_libraries.py), a filtered one (gene_filter.py), a curated one
+    (import_curated.py) or a combined one (add_to_library.py) has no single build assembly: its library is <version>-families.prefixed.fa,
     its names already carry their sources, and its library/ holds merge_record.json,
-    filter_record.json or curation_record.json. For it, the build id is the version and the
+    filter_record.json, curation_record.json or combine_record.json. For it, the build id is the version and the
     "original" file is that library itself.
     """
     lib = version_folder(version) / "library"

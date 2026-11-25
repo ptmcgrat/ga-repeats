@@ -8,6 +8,8 @@ library: every site with sequence between the flanks (mitfa, rx1) and every tbx2
 table, is cut from its genome and annotated by RepeatMasker (-engine rmblast -no_is -nolow) against the classified
 Repbase (all entries, as Carleton et al.'s CENSOR search used all of Repbase; --cichlid-only for the curated cichlid
 entries). Each site's Repbase annotation is printed beside ours (from insertion_sites.py's annotation table).
+With --with-version <version>, the sites are annotated with that version's whole library instead (for instance our
+library combined with Repbase), to see which family wins each site (repeats_029).
 
 Usage (from the repository root):
   python scripts/site_annotation.py --version RI_v5          # dry run
@@ -34,6 +36,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", required=True, help="the version whose insertion_sites.py tables to use, e.g. RI_v5")
     parser.add_argument("--cichlid-only", action="store_true", help="annotate with the curated cichlid entries only")
+    parser.add_argument("--with-version", help="annotate with this version's whole library instead of Repbase "
+                                               "(e.g. a library combined with Repbase: which family wins at each site)")
     parser.add_argument("--species", nargs="+", default=["Cichlidae", "Oreochromis_niloticus"])
     parser.add_argument("--release", default="20181026")
     c.add_common_args(parser)
@@ -92,16 +96,19 @@ def main(argv=None) -> None:
     for f in (sites_file, ours_file, repbase_fa, entries_file):
         if not f.exists():
             c.stop(f"{f} not found: run insertion_sites.py and repbase_match.py first")
-    target = args.scratch / "comparisons" / "insertion_sites" / f"{args.version}_site_repbase{'_cichlid' if args.cichlid_only else ''}.tsv"
+    tag = f"lib_{args.with_version}" if args.with_version else ("repbase_cichlid" if args.cichlid_only else "repbase")
+    target = args.scratch / "comparisons" / "insertion_sites" / f"{args.version}_site_{tag}.tsv"
     if target.exists():
         c.stop(f"{target} exists; results are never overwritten")
-    work = args.scratch / args.version / ("site_annotation_cichlid" if args.cichlid_only else "site_annotation")
+    work = args.scratch / args.version / {"repbase": "site_annotation", "repbase_cichlid": "site_annotation_cichlid"}.get(
+        tag, f"site_annotation_{tag}")
     if work.exists():
         c.stop(f"{work} exists from an earlier attempt; clear it with: rm -r {work}")
     with open(sites_file) as handle:
         sites = read_sites(handle)
     print(f"{args.version}: {len(sites)} sites with sequence, annotated with "
-          + ("the curated cichlid entries" if args.cichlid_only else "all of Repbase") + f"\nresult: {target}")
+          + (f"{args.with_version}'s whole library" if args.with_version else
+             "the curated cichlid entries" if args.cichlid_only else "all of Repbase") + f"\nresult: {target}")
     for s in sites:
         print(f"  {s[0]} {s[1]} {s[2]}:{s[3] + 1:,}-{s[4]:,} ({s[4] - s[3]:,} bp)")
     if not args.go:
@@ -109,8 +116,8 @@ def main(argv=None) -> None:
         return
 
     work.mkdir(parents=True)
-    lib = repbase_fa
-    if args.cichlid_only:
+    lib = c.library_files(args.with_version)[2] if args.with_version else repbase_fa
+    if args.cichlid_only and not args.with_version:
         with open(entries_file) as handle:
             wanted = {r["name"] for r in csv.DictReader(handle, delimiter="\t") if r["species"] in set(args.species)}
         lib, keep = work / "curated.fa", False
@@ -142,7 +149,7 @@ def main(argv=None) -> None:
         mine = [h for h in hits if h[0] == name]
         theirs = [r for r in ours if r["assembly"] == assembly and r["locus"] == locus]
         print(f"\n{assembly} {locus} {seq}:{start + 1:,}-{end:,} ({end - start:,} bp)")
-        print("  Repbase: " + ("; ".join(f"{h[1]}-{h[2]} {h[3]} ({h[4]}, {h[5]:.0f}%)" for h in mine) or "no match"))
+        print(f"  {'library' if args.with_version else 'Repbase'}: " + ("; ".join(f"{h[1]}-{h[2]} {h[3]} ({h[4]}, {h[5]:.0f}%)" for h in mine) or "no match"))
         print("  ours:    " + ("; ".join(f"{int(r['start']) - start + 1}-{int(r['end']) - start} {r['family']} ({r['label']})"
                                          for r in theirs) or "nothing masked"))
         for h in mine:

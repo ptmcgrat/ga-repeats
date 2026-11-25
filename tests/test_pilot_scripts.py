@@ -47,6 +47,10 @@ import compare_variants as cv  # noqa: E402
 import fetch_reference as fref  # noqa: E402
 import te_composition as tc  # noqa: E402
 import curation_report as crep  # noqa: E402
+import repbase_lineage as rbl  # noqa: E402
+import add_to_library as atl  # noqa: E402
+import fetch_ensembl as fens  # noqa: E402
+import ensembl_masking as emask  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -908,6 +912,98 @@ class CurationReportTest(unittest.TestCase):
         p = Path(tempfile.mkdtemp()) / "lib.fa"
         p.write_text(">A_1#LTR/Gypsy\tTEtrimmer\tGood\nacgt\nAC\n>B_2#Unknown\nTT\n")
         self.assertEqual(crep.read_records(p), [("A_1", "LTR/Gypsy", "TEtrimmer Good", "ACGTAC"), ("B_2", "Unknown", "", "TT")])
+
+
+LINEAGE_PRINTOUT = """
+
+RepeatMasker Taxonomy Database Utility
+======================================
+Species = Astatotilapia calliptera
+Lineage = Astatotilapia calliptera
+          Astatotilapia
+          Haplochromini
+          Pseudocrenilabrinae
+          African cichlids
+          Cichlidae
+          Cichliformes
+          Teleostei
+          Actinopterygii
+          Euteleostomi
+          Gnathostomata vertebrate
+          Vertebrata Metazoa
+          Craniata chordata
+          Chordata
+          Metazoa
+          Eukaryota
+          cellular organisms
+"""
+
+
+class RepbaseLineageTest(unittest.TestCase):
+    def test_lineage_and_selection(self):
+        species, lineage = rbl.parse_lineage(LINEAGE_PRINTOUT)
+        self.assertEqual((species, lineage[0], lineage[-1], len(lineage)),
+                         ("Astatotilapia calliptera", "Astatotilapia calliptera", "cellular organisms", 17))
+        terms = rbl.lineage_terms(lineage)
+        for name in ("Cichlidae", "Teleostei", "Vertebrata", "Gnathostomata", "Craniata", "Eukaryota", "Astatotilapia_calliptera"):
+            self.assertTrue(rbl.in_lineage(name, terms), name)
+        for name in ("Oreochromis_niloticus", "Danio_rerio", "Oryza_sativa", "Salmo_salar", "Eutheria"):
+            self.assertFalse(rbl.in_lineage(name, terms), name)
+        with self.assertRaises(ValueError):
+            rbl.parse_lineage("nothing here")
+        self.assertEqual(rbl.clean("Gypsy-1_DR-I:x"), "Gypsy-1_DR-I_x")
+
+
+class CombinedVersionTest(unittest.TestCase):
+    def test_a_combined_version_uses_its_own_library(self):
+        import tempfile
+        root = Path(tempfile.mkdtemp())
+        lib = root / "RI_v9" / "library"
+        lib.mkdir(parents=True)
+        (lib / "RI_v9-families.prefixed.fa").write_text(">A#LTR\nAC\n>Repbase_hAT-8_AFC#DNA/hAT-Ac\nGG\n")
+        (lib / "combine_record.json").write_text("{}")
+        saved = c.version_folder
+        c.version_folder = lambda version: root / version
+        try:
+            self.assertEqual(c.library_files("RI_v9")[0], "RI_v9")
+            self.assertEqual(atl.names_of(lib / "RI_v9-families.prefixed.fa"), ["A", "Repbase_hAT-8_AFC"])
+        finally:
+            c.version_folder = saved
+
+
+class EnsemblTest(unittest.TestCase):
+    def test_bsd_checksum_matches_sum(self):
+        import shutil
+        import subprocess
+        import tempfile
+        p = Path(tempfile.mkdtemp()) / "x.bin"
+        p.write_bytes(bytes(range(256)) * 5000 + b"tail")
+        mine = fens.bsd_sum_python(p)
+        if shutil.which("sum"):
+            a, b = subprocess.run(["sum", "-r", str(p)], capture_output=True, text=True).stdout.split()[:2]
+            self.assertEqual(mine, (int(a), int(b)))
+        self.assertEqual(mine[1], (256 * 5000 + 4 + 1023) // 1024)
+        self.assertEqual(fens.parse_checksums("12345 678 a.fa.gz\nbad line\n9 1 CHECKSUMS\n"), {"a.fa.gz": (12345, 678), "CHECKSUMS": (9, 1)})
+
+    def test_names_runs_and_overlap(self):
+        report = ["# Sequence-Name\tSequence-Role\tAssigned-Molecule\tAssigned-Molecule-Location/Type\tGenBank-Accn\t"
+                  "Relationship\tRefSeq-Accn\tAssembly-Unit\tSequence-Length\tUCSC-style-name\n",
+                  "LG1\tassembled-molecule\t1\tChromosome\tLS420019.2\t=\tNC_039302.1\tPrimary\t30\tna\n",
+                  "scf7\tunlocalized-scaffold\t1\tChromosome\tOOHO01000007.1\t=\tNW_020000007.1\tPrimary\t12\tna\n"]
+        aliases = emask.report_aliases(report)
+        self.assertEqual(aliases["1"], "NC_039302.1")                 # the chromosome, not the scaffold placed on it
+        self.assertEqual(aliases["OOHO01000007.1"], "NW_020000007.1")
+        fasta = [">1 dna_sm:primary_assembly\n", "ACgtta\n", "acGGNN\n", ">OOHO01000007.1 dna_sm:scaffold\n", "aaaaCC\n", ">x9\n", "TTTT\n"]
+        recs = list(emask.softmasked_intervals(fasta))
+        self.assertEqual(recs[0], ("1", 12, [(2, 8)]))                 # a run continued across the line break
+        mapping, unmapped = emask.map_names({"1": 30, "OOHO01000007.1": 12, "x9": 99},
+                                            aliases, {"NC_039302.1": 30, "NW_020000007.1": 12})
+        self.assertEqual((mapping, unmapped), ({"1": "NC_039302.1", "OOHO01000007.1": "NW_020000007.1"}, ["x9"]))
+        mapping, _ = emask.map_names({"1": 31}, aliases, {"NC_039302.1": 30})   # a length that disagrees is refused
+        self.assertEqual(mapping, {})
+        rows = [("s", 0, 10, "f", "DNA"), ("s", 20, 30, "g", "LTR")]
+        got = [(r[3], n) for r, n in emask.overlap([(5, 25)], rows)]
+        self.assertEqual(got, [("f", 5), ("g", 5)])
 
 
 class MergeEffect(unittest.TestCase):

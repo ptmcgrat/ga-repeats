@@ -10,6 +10,8 @@ one table, a column per version:
                curated class, overall and per curated class                               (curated_annotation.py)
   recovery     curated families perfect / good / present / not found                     (family_recovery.py)
   composites   relabel / composite / unknown / partial families, and the composites' footprint (composite_families.py)
+  Ensembl      for a reference genome: of Ensembl's masked bases, the share the version masks, and the reverse
+               (ensembl_masking.py)
 A check not yet run for a version shows as '-', and the printout names the command that fills it.
 
 Usage (from the repository root):
@@ -113,6 +115,14 @@ def metrics(version: str, args, genome_bp: int, cur_totals: Optional[Counter], m
             m["recovery perfect/good/present/not found"] = "/".join(all_row[k] for k in ("perfect", "good", "present", "not found"))
     else:
         missing.append(f"python scripts/family_recovery.py --version {version} --go")
+    ens = args.scratch / "comparisons" / "ensembl" / f"{version}_{args.assembly}.tsv"
+    if ens.exists():
+        values = {r["metric"]: r["value"] for r in read_tsv(ens)}
+        for k in ("Ensembl-masked bases masked by version %", "version-masked bases masked by Ensembl %"):
+            if k in values:
+                m[k] = float(values[k])
+    elif c.is_reference(args.assembly):
+        missing.append(f"python scripts/ensembl_masking.py --version {version} --assembly {args.assembly} --go")
     comp = args.scratch / "comparisons" / "composite" / f"{version}_{args.tag}_families.tsv"
     if comp.exists():
         rows = read_tsv(comp)
