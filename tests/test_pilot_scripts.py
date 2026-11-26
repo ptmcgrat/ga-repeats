@@ -51,6 +51,7 @@ import repbase_lineage as rbl  # noqa: E402
 import add_to_library as atl  # noqa: E402
 import fetch_ensembl as fens  # noqa: E402
 import ensembl_masking as emask  # noqa: E402
+import build_library as bl  # noqa: E402
 
 DATA = HERE / "data"
 
@@ -1004,6 +1005,16 @@ class EnsemblTest(unittest.TestCase):
         rows = [("s", 0, 10, "f", "DNA"), ("s", 20, 30, "g", "LTR")]
         got = [(r[3], n) for r, n in emask.overlap([(5, 25)], rows)]
         self.assertEqual(got, [("f", 5), ("g", 5)])
+
+
+class BuildLibraryTest(unittest.TestCase):
+    def test_prefixing_and_seed(self):
+        lines = [">rnd-1_family-1#LTR/Gypsy ( RepeatScout Family Size = 12 )\n", "ACGT\n", ">ltr-1_family-7#LTR/Pao\n", "GG\n"]
+        self.assertEqual(list(bl.prefix_names(lines, "MZ_NMK2024a")),
+                         [">MZ_NMK2024a_rnd-1_family-1#LTR/Gypsy ( RepeatScout Family Size = 12 )\n", "ACGT\n",
+                          ">MZ_NMK2024a_ltr-1_family-7#LTR/Pao\n", "GG\n"])
+        self.assertEqual(bl.seed_of("RepeatModeler Version 2.0.9\nRandom Number Seed: 1793333684\n"), "1793333684")
+        self.assertIsNone(bl.seed_of("no seed here"))
 
 
 class MergeEffect(unittest.TestCase):

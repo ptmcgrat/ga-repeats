@@ -1,6 +1,6 @@
 # Repeats (project 1): established findings
 
-**Version 4, 2026-11-23** (C4: Quah et al.'s figures are for another assembly). Version 3, 2026-11-19: B5 checked independently; B12–B14 added; C2 resolved as B12; C5 added. A record of what our data show, kept for framing a paper. It is updated whenever a result
+**Version 5, 2026-11-25** (B15–B18 on Quah et al.'s assembly fAstCal1.2; C4 narrowed). Version 4, 2026-11-23: C4, Quah et al.'s figures are for another assembly. Version 3, 2026-11-19: B5 checked independently; B12–B14 added; C2 resolved as B12; C5 added. A record of what our data show, kept for framing a paper. It is updated whenever a result
 becomes solid, and it is not the specification: decisions and open questions stay in `repeats_spec.md`.
 
 **What counts as established:** measured on our data, with a stated method, from recorded inputs that the repository's
@@ -220,6 +220,55 @@ another class's entry:
 **B10. Gaps in assemblies matter for per-chromosome comparisons.** DT_004f is 2.98% gap, including 28.4 Mb (27%) of its
 LG3; the other assemblies are 0–1.8% gap. Three assemblies list the mitochondrion as a chromosome.
 
+**B15. On Quah et al.'s own assembly, our masking agrees with Ensembl's published masking and is not above it.** On
+fAstCal1.2 (GCF_900246225.1, 880.4 Mb), with our libraries combined with the Repbase subset of B17 (`RI_v9`, `RI_v10`):
+
+| | `RI_v9` | `RI_v10` |
+|---|---|---|
+| bases masked by Ensembl (release 103) | 42.26% | 42.26% |
+| bases masked by our library | 40.86% | 40.77% |
+| masked by both | 38.01% | 37.95% |
+| of our masked bases, Ensembl also masks | 93.01% | 93.08% |
+| of Ensembl's masked bases, we also mask | 89.95% | 89.80% |
+
+- **By class,** the share of our bases Ensembl also masks (`RI_v9`): DNA 95.7%, LINE 95.7%, SINE 93.6%, LTR 90.5%, Unknown
+  85.6%, other 85.0%.
+- **Caveats:** Ensembl's soft-masking carries no classes and includes its masking of low-complexity and tandem
+  sequence; Ensembl's pipeline may itself use Repbase.
+
+**B16. On the same assembly, our TE share is 2.6 points above Quah et al.'s, unevenly by class.** In RepeatMasker's
+summary classes, as a share of the whole assembly (Quah et al. 2025: 36.55% TEs, Unknown included):
+
+| class | `RI_v9` | `RI_v10` | Quah et al. |
+|---|---|---|---|
+| all TEs | 39.21% | 39.12% | 36.55% |
+| DNA | 16.82% | 16.82% | 12.09% |
+| LINE | 9.71% | 9.70% | 8.32% |
+| LTR | 6.39% | 6.47% | 7.38% |
+| Unknown | 5.38% | 5.21% | 8.54% |
+| SINE, RC and Retroposon together | 0.91% | 0.92% | under 1% |
+
+- **Outside TEs:** simple repeats 1.33–1.34%, low complexity 0.19–0.20%, satellites 0.08%, small RNA 0.04%.
+- **Gene-derived families** (tagged in `RI_v10`) mask 1.02% of the assembly.
+- **On AC_fAstCal68,** a different assembly, the gap had been 4.7 points (C4).
+
+**B17. Adding Repbase does not change the classes at the published insertions.** The Repbase entries of *A. calliptera*'s
+lineage (RepeatMasker's `-species` rule, from its 4.1.0 taxonomy) are 245 of Repbase 20181026's 49,011: Cichlidae 161,
+Vertebrata_Metazoa 79, Metazoa 4, Teleostei 1. With them in the library, our own families still win each site:
+- ***tbx2a*** (MZ_NMK2024a): family 769, LTR/Gypsy, at 99%. On its own, Repbase's hAT-8_AFC matched the insertion at 97%.
+- ***mitfa*** (MC_MC1m): our LTR families, at 100%.
+- ***rx1*** (AC_fAstCal68): our LINE/L1 family 10903, at 99%, rather than Repbase's Rex1-5_AFC (LINE/Rex-Babar).
+
+Our families were built from these genomes and match their copies more closely than Repbase consensus sequences built
+from other cichlids, and RepeatMasker keeps the best-scoring match. A mislabelled family is not overridden by adding a
+correct one.
+
+**B18. Concatenating and merging the libraries give the same result.** On fAstCal1.2, `RI_v9` (the three libraries
+concatenated, 7,345 families with Repbase) and `RI_v10` (merged and tagged, 5,533) differ by at most 0.15 points on every
+measure: masking 40.86% and 40.77%; TEs 39.21% and 39.12%; agreement with Ensembl within 0.15 points; the same classes at
+the three sites. On DT_004f, without Repbase, they had masked 44.00% and 43.91%, with the same class on 97.9% of shared
+bases.
+
 ## C. Not yet established
 
 Each of these has a test planned or open, and none should be cited as a finding.
@@ -236,8 +285,8 @@ Each of these has a test planned or open, and none should be cited as a finding.
   know. Its arrays' positions fit a centromeric satellite, but position alone doesn't prove it.
 - **C5. What the rest of MC's *mitfa* insertion is remains open.** About 840 bp lie outside its Rex1 stretch. Our
   library labels them LTR/Gypsy (family 276), and Repbase finds nothing there.
-- **C4. The 4.7-point gap to Quah et al. 2025 is unexplained, and partly an assembly difference.** On AC_fAstCal68 we
-  annotate 41.26% as transposons; Quah et al. report 36.55% for *A. calliptera*, but for fAstCal1.2 (GCF_900246225.1;
-  PacBio CLR, contig N50 4.4 Mb, 0.88 Gb), not for AC_fAstCal68 (GCA_964374335.1, contig N50 28.2 Mb). Their libraries
-  also included Repbase; ours do not yet. The planned test: our libraries on fAstCal1.2 itself, class by class against
-  their figures (DNA 12.09%, LINE 8.32%, LTR 7.38%, Unknown 8.54%).
+- **C4. The remaining gap to Quah et al. 2025 is 2.6 points, and may be partly classification.** On their own assembly
+  the gap in TE share is 2.6 points, down from 4.7 on AC_fAstCal68 (B16). It is uneven: DNA +4.7, Unknown −3.2 to −3.3,
+  LTR −0.9 to −1.0, so some sequence they left Unknown may be what we call DNA. Ensembl masks more of the assembly than we
+  do (B15), so over-masking is an unlikely cause. Without their annotation file the class differences cannot be
+  traced.
